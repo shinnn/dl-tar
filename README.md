@@ -21,12 +21,12 @@ const url = 'https://****.org/my-archive.tar';
 */
 
 dlTar(url, 'my/dir').subscribe({
-  next({header, bytes}) {
-    if (bytes !== header.size) {
+  next({entry}) {
+    if (entry.bytes !== entry.header.size) {
       return;
     }
 
-    console.log(`✓ ${header.name}`);
+    console.log(`✓ ${entry.header.name}`);
   },
   complete() {
     readdirSync('my/dir'); //=> ['INSTALL', LICENSE', 'README.md', 'bin']
@@ -66,18 +66,26 @@ const dlTar = require('dl-tar');
 *options*: `Object`  
 Return: [`Observable`](http://www.ecma-international.org/ecma-262/6.0/#sec-promise-constructor) ([zenparsing's implementation](https://github.com/zenparsing/zen-observable))
 
-When the observable is [subscribe](https://tc39.github.io/proposal-observable/#observable-prototype-subscribe)d, it starts to download the tar archive, extract it and successively send extraction progress as objects to the observer.
+When the observable is [subscribe](https://tc39.github.io/proposal-observable/#observable-prototype-subscribe)d, it starts to download the tar archive, extract it and successively send extraction progress to its [observer](https://github.com/tc39/proposal-observable#observer).
 
-Every progress object have two properties `header` and `bytes`. `bytes` is the total size of currently extracted entry, and `header` is [a header of the entry](https://github.com/mafintosh/tar-stream#headers).
+#### Progress
 
-For example you can get the progress of each entry as a percentage by `bytes / header.size * 100`.
+Every progress object have two properties `entry` and `response`.
+
+##### entry
+
+Type: `Object {bytes: <Number>, header: <Object>}`
+
+`entry.bytes` is the total size of currently extracted entry, and `entry.header` is [a header of the entry](https://github.com/mafintosh/tar-stream#headers).
+
+For example you can get the progress of each entry as a percentage by `progress.entry.bytes / progress.entry.header.size * 100`.
 
 ```javascript
 dlTar('https://****.org/my-archive.tar', 'my/dir').subscribe(progress => {
-  console.log(`${(progress.bytes / progress.header.size * 100).toFixed(1)} %`);
+  console.log(`${(progress.entry.bytes / progress.entry.header.size * 100).toFixed(1)} %`);
 
-  if (progress.bytes === progress.header.size) {
-    console.log(`>> OK ${progress.header.name}\n`);
+  if (progress.entry.bytes === progress.entry.header.size) {
+    console.log(`>> OK ${progress.entry.header.name}`);
   }
 });
 ```
@@ -86,7 +94,7 @@ dlTar('https://****.org/my-archive.tar', 'my/dir').subscribe(progress => {
 0.1 %
 0.3 %
 0.4 %
-[...]
+︙
 99.6 %
 99.8 %
 99.9 %
@@ -95,16 +103,22 @@ dlTar('https://****.org/my-archive.tar', 'my/dir').subscribe(progress => {
 0.1 %
 0.2 %
 0.3 %
-[...]
+︙
 ```
+
+##### response
+
+Type: `Object {bytes: <Number>, headers: <Object>}`
+
+`response.headers` is a [response header object](https://nodejs.org/api/http.html#http_message_headers) derived from [`http.IncomingMessage`](https://nodejs.org/api/http.html#http_class_http_incomingmessage), and `response.bytes` is a total content length of the downloaded archive.
 
 #### Options
 
-You can pass options to [Request](https://github.com/request/request#requestoptions-callback) and [tar-fs](https://github.com/mafintosh/tar-fs)'s [`extract`](https://github.com/mafintosh/tar-fs/blob/12968d9f650b07b418d348897cd922e2b27ec18c/index.js#L167).
+You can pass options to [Request](https://github.com/request/request#requestoptions-callback) and [tar-fs](https://github.com/mafintosh/tar-fs)'s [`extract` method](https://github.com/mafintosh/tar-fs/blob/12968d9f650b07b418d348897cd922e2b27ec18c/index.js#L167).
 
 Note that [`strip` option](https://github.com/mafintosh/tar-fs/blob/12968d9f650b07b418d348897cd922e2b27ec18c/index.js#L47) defaults to `1`, not `0`. That means the top level directory is stripped off by default.
 
-Additionally, you can use the following option.
+Additionally, you can use the following:
 
 ##### tarTransform
 

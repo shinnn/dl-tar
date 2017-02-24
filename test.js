@@ -56,7 +56,7 @@ const server = createServer((req, res) => {
   tar.finalize();
   tar.pipe(createGzip()).pipe(res);
 }).listen(3018, () => test('dlTar()', async t => {
-  t.plan(28);
+  t.plan(30);
 
   await rmfr('tmp').catch(t.fail);
 
@@ -65,15 +65,26 @@ const server = createServer((req, res) => {
 
   dlTar('http://localhost:3018/', 'tmp/a').subscribe({
     next(progress) {
-      if (progress.header.name === '1.txt') {
-        t.strictEqual(progress.bytes, 2, 'should send download progress to the subscription.');
+      if (progress.entry.header.name === '1.txt') {
+        t.strictEqual(progress.entry.bytes, 2, 'should send download progress to the subscription.');
         return;
       }
 
       t.strictEqual(
-        progress.header.name,
+        progress.entry.header.name,
         'nested/2.txt',
         'should send entry headers to the subscription.'
+      );
+
+      t.ok(
+        Number.isSafeInteger(progress.response.bytes),
+        'should send total donwload bytes to the subscription.'
+      );
+
+      t.strictEqual(
+        progress.response.headers['content-type'],
+        'application/x-tar',
+        'should send response headers to the subscription.'
       );
     },
     async complete() {
@@ -246,7 +257,7 @@ const server = createServer((req, res) => {
       err.toString(),
       'TypeError: `tarTransform` option must be a transform stream that modifies ' +
       'the downloaded tar archive before extracting, but got a non-stream value 0.',
-      'should fail when `tarTransform` option is a stream.'
+      'should fail when `tarTransform` option is not an object.'
     )
   });
 
@@ -256,7 +267,7 @@ const server = createServer((req, res) => {
       err.toString(),
       'TypeError: `tarTransform` option must be a transform stream that modifies ' +
       'the downloaded tar archive before extracting, but got a readable stream instead.',
-      'should fail when `tarTransform` option is a stream.'
+      'should fail when `tarTransform` option is a stream but not a transform one.'
     )
   });
 
@@ -265,7 +276,7 @@ const server = createServer((req, res) => {
     error: err => t.strictEqual(
       err.toString(),
       'TypeError: `mapStream` option must be a function, but got Uint8Array [  ].',
-      'should fail when `tarTransform` option is a stream.'
+      'should fail when `mapTransform` option is a stream.'
     )
   });
 

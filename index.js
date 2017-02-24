@@ -110,6 +110,8 @@ module.exports = function dlTar(url, dest, options) {
 
     const mapStream = options.mapStream || echo;
     const fileStreams = [];
+    let responseHeaders;
+    let responseBytes = 0;
 
     const extractStream = extract(dest, Object.assign({
       fs: gracefulFs,
@@ -139,7 +141,13 @@ module.exports = function dlTar(url, dest, options) {
           transform(chunk, encoding, cb) {
             bytes += chunk.length;
 
-            observer.next({header, bytes});
+            observer.next({
+              entry: {header, bytes},
+              response: {
+                headers: responseHeaders,
+                bytes: responseBytes
+              }
+            });
 
             cb(null, chunk);
           }
@@ -151,17 +159,24 @@ module.exports = function dlTar(url, dest, options) {
       const pipe = [
         request(Object.assign({url}, options, priorOption))
         .on('response', function(response) {
-          if (200 <= response.statusCode && response.statusCode <= 299) {
+          if (response.statusCode < 200 || 299 < response.statusCode) {
+            this.emit('error', new Error(`${response.statusCode} ${response.statusMessage}`));
             return;
           }
 
-          this.emit('error', new Error(`${response.statusCode} ${response.statusMessage}`));
+          responseHeaders = response.headers;
+        }),
+        new Transform({
+          transform(chunk, encoding, cb) {
+            responseBytes += chunk.length;
+            cb(null, chunk);
+          }
         }),
         extractStream
       ];
 
       if (options.tarTransform) {
-        pipe.splice(1, 0, options.tarTransform);
+        pipe.splice(2, 0, options.tarTransform);
       }
 
       pump(pipe, err => {
