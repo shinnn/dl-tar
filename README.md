@@ -45,6 +45,8 @@ dlTar(url, 'my/dir').subscribe({
 Completed.
 ```
 
+For [gzipped](https://tools.ietf.org/html/rfc1952) tar (`tar.gz`), use [`dl-tgz`](https://github.com/shinnn/dl-tgz) instead.
+
 ## Installation
 
 [Use npm.](https://docs.npmjs.com/cli/install)
