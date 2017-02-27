@@ -111,7 +111,7 @@ module.exports = function dlTar(url, dest, options) {
 
     const mapStream = options.mapStream || echo;
     const fileStreams = [];
-    let completed = false;
+    let ended = false;
     let responseHeaders;
     let responseBytes = 0;
 
@@ -182,18 +182,22 @@ module.exports = function dlTar(url, dest, options) {
       }
 
       pump(pipe, err => {
+        ended = true;
+
         if (err && err !== canceledError) {
           observer.error(err);
           return;
         }
 
-        completed = true;
         observer.complete();
       });
-    }).catch(err => observer.error(err));
+    }).catch(err => {
+      ended = true;
+      observer.error(err);
+    });
 
     return function cancelExtract() {
-      if (completed) {
+      if (ended) {
         return;
       }
 
