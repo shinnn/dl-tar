@@ -18,6 +18,7 @@ const loadRequestFromCwdOrNpm = require('load-request-from-cwd-or-npm');
 const Observable = require('zen-observable');
 const pump = require('pump');
 
+const canceledError = new Error('Canceled.');
 const priorOption = {encoding: null};
 
 function echo(val) {
@@ -110,6 +111,7 @@ module.exports = function dlTar(url, dest, options) {
 
     const mapStream = options.mapStream || echo;
     const fileStreams = [];
+    let completed = false;
     let responseHeaders;
     let responseBytes = 0;
 
@@ -180,19 +182,22 @@ module.exports = function dlTar(url, dest, options) {
       }
 
       pump(pipe, err => {
-        if (err) {
+        if (err && err !== canceledError) {
           observer.error(err);
           return;
         }
 
+        completed = true;
         observer.complete();
       });
     }).catch(err => observer.error(err));
 
     return function cancelExtract() {
-      for (const fileStream of fileStreams) {
-        fileStream.unpipe();
+      if (completed) {
+        return;
       }
+
+      extractStream.emit('error', canceledError);
     };
   });
 };

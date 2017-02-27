@@ -6,7 +6,7 @@
   "author": "Shinnosuke Watanabe (https://github.com/shinnn)",
   "scripts": {
     "pretest": "eslint --fix --format=codeframe index.js test.js",
-    "test": "nyc --reporter=html --reporter=text node --throw-deprecation test.js"
+    "test": "nyc --reporter=html --reporter=text node test.js"
   },
   "license": "MIT",
   "files": [
