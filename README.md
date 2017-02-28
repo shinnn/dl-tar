@@ -5,7 +5,7 @@
 [![Build status](https://ci.appveyor.com/api/projects/status/83sbr9dtbp3hreoy/branch/master?svg=true)](https://ci.appveyor.com/project/ShinnosukeWatanabe/dl-tar/branch/master)
 [![Coverage Status](https://img.shields.io/coveralls/shinnn/dl-tar.svg)](https://coveralls.io/github/shinnn/dl-tar?branch=master)
 
-A [Node.js](https://nodejs.org/) module to download and extract a [tar](https://www.gnu.org/software/tar/) archive with [Observable](https://tc39.github.io/proposal-observable/) API
+A [Node.js](https://nodejs.org/) module to download and extract a [tar](https://www.gnu.org/software/tar/) archive with the [Observable](https://tc39.github.io/proposal-observable/) API
 
 ```javascript
 const {readdirSync} = require('fs');
@@ -66,9 +66,11 @@ const dlTar = require('dl-tar');
 *tarArchiveUrl*: `String`  
 *extractDir*: `String` (a path where the archive will be extracted)  
 *options*: `Object`  
-Return: [`Observable`](http://www.ecma-international.org/ecma-262/6.0/#sec-promise-constructor) ([zenparsing's implementation](https://github.com/zenparsing/zen-observable))
+Return: [`Observable`](https://tc39.github.io/proposal-observable/#observable) ([zenparsing's implementation](https://github.com/zenparsing/zen-observable))
 
-When the observable is [subscribe](https://tc39.github.io/proposal-observable/#observable-prototype-subscribe)d, it starts to download the tar archive, extract it and successively send extraction progress to its [observer](https://github.com/tc39/proposal-observable#observer).
+When the [observable](https://github.com/tc39/proposal-observable#observable) is [subscribe](https://tc39.github.io/proposal-observable/#observable-prototype-subscribe)d, it starts to download the tar archive, extract it and successively send extraction progress to its [observer](https://github.com/tc39/proposal-observable#observer).
+
+When the [subscription](https://tc39.github.io/proposal-observable/#subscription-objects) is [unsubscribe](https://tc39.github.io/proposal-observable/#subscription-prototype-unsubscribe)d, it stops downloading and extracting.
 
 #### Progress
 
@@ -116,9 +118,10 @@ Type: `Object {bytes: <Number>, headers: <Object>}`
 
 #### Options
 
-You can pass options to [Request](https://github.com/request/request#requestoptions-callback) and [tar-fs](https://github.com/mafintosh/tar-fs)'s [`extract` method](https://github.com/mafintosh/tar-fs/blob/12968d9f650b07b418d348897cd922e2b27ec18c/index.js#L167).
+You can pass options to [Request](https://github.com/request/request#requestoptions-callback) and [tar-fs](https://github.com/mafintosh/tar-fs)'s [`extract` method](https://github.com/mafintosh/tar-fs/blob/12968d9f650b07b418d348897cd922e2b27ec18c/index.js#L167). Note that:
 
-Note that [`strip` option](https://github.com/mafintosh/tar-fs/blob/12968d9f650b07b418d348897cd922e2b27ec18c/index.js#L47) defaults to `1`, not `0`. That means the top level directory is stripped off by default.
+* [`strip` option](https://github.com/mafintosh/tar-fs/blob/12968d9f650b07b418d348897cd922e2b27ec18c/index.js#L47) defaults to `1`, not `0`. That means the top level directory is stripped off by default.
+* [`fs`](https://github.com/mafintosh/tar-fs/blob/e59deed830fded0e4e5beb016d2df9c7054bb544/index.js#L65) option defaults to [graceful-fs](https://github.com/isaacs/node-graceful-fs) for more stability.
 
 Additionally, you can use the following:
 
