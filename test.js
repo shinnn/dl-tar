@@ -181,26 +181,6 @@ const server = createServer((req, res) => {
     )
   });
 
-  dlTar('http://localhost:3018', 'tmp/d', {mapStream: () => new Uint16Array()}).subscribe({
-    complete: fail,
-    error: err => t.strictEqual(
-      err.toString(),
-      'TypeError: The function passed to `mapStream` option must return a stream,' +
-      ' but returned a non-stream value Uint16Array [  ].',
-      'should fail when the requested content is not found.'
-    )
-  });
-
-  dlTar('http://localhost:3018', 'tmp/e', {mapStream: () => process.stdout}).subscribe({
-    complete: fail,
-    error: err => t.strictEqual(
-      err.toString(),
-      'TypeError: The function passed to `mapStream` option must return a stream' +
-      ' that is readable, but returned a non-readable stream.',
-      'should fail when the requested content is not found.'
-    )
-  });
-
   dlTar(Math.sign, '__').subscribe({
     complete: fail,
     error: err => t.strictEqual(
@@ -281,7 +261,7 @@ const server = createServer((req, res) => {
       err.toString(),
       'TypeError: `tarTransform` option must be a transform stream that modifies ' +
       'the downloaded tar archive before extracting, but got a readable stream instead.',
-      'should fail when `tarTransform` option is a stream but not a transform one.'
+      'should fail when `tarTransform` option is a non-transform stream.'
     )
   });
 
@@ -290,7 +270,27 @@ const server = createServer((req, res) => {
     error: err => t.strictEqual(
       err.toString(),
       'TypeError: `mapStream` option must be a function, but got Uint8Array [  ].',
-      'should fail when `mapTransform` option is a stream.'
+      'should fail when `mapTransform` option is not a function.'
+    )
+  });
+
+  dlTar('http://localhost:3018', 'tmp/d', {mapStream: () => new Uint16Array()}).subscribe({
+    complete: fail,
+    error: err => t.strictEqual(
+      err.toString(),
+      'TypeError: The function passed to `mapStream` option must return a stream,' +
+      ' but returned a non-stream value Uint16Array [  ].',
+      'should fail when `mapTransform` option returns a non-stream value.'
+    )
+  });
+
+  dlTar('http://localhost:3018', 'tmp/e', {mapStream: () => process.stdout}).subscribe({
+    complete: fail,
+    error: err => t.strictEqual(
+      err.toString(),
+      'TypeError: The function passed to `mapStream` option must return a stream' +
+      ' that is readable, but returned a non-readable stream.',
+      'should fail when `mapTransform` option returns a non-readable stream.'
     )
   });
 
@@ -330,7 +330,7 @@ const server = createServer((req, res) => {
       err.toString(),
       'RangeError: Expected `strip` option to be a non-negative integer (0, 1, ...) that specifies ' +
       'how many leading components from file names will be stripped, but got a too large number.',
-      'should fail when `strip` option exceeds the max safe integer in JavaScript.'
+      'should fail when `strip` option exceeds the max safe integer.'
     )
   });
 
