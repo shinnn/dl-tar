@@ -56,7 +56,7 @@ const server = createServer((req, res) => {
   tar.finalize();
   tar.pipe(createGzip()).pipe(res);
 }).listen(3018, () => test('dlTar()', async t => {
-  t.plan(30);
+  t.plan(32);
 
   await rmfr('tmp').catch(t.fail);
 
@@ -125,12 +125,12 @@ const server = createServer((req, res) => {
     }
   });
 
-  const observable = dlTar('/huge', 'tmp/c', {
+  const subscription = dlTar('/huge', 'tmp/c', {
     baseUrl: 'http://localhost:3018',
     tarTransform: createGunzip()
   }).subscribe({
     async next() {
-      observable.unsubscribe();
+      subscription.unsubscribe();
 
       const content = await readUtf8File('tmp/c/huge.txt').catch(t.fail);
       t.strictEqual(content.slice(0, 3), '...', 'should support `tarTransform` option.');
@@ -146,6 +146,15 @@ const server = createServer((req, res) => {
       );
     }
   });
+
+  dlTar('http://localhost:3018', __filename).subscribe({
+    start(subscriptionItself) {
+      process.nextTick(() => {
+        t.ok(subscriptionItself.closed, 'should be immediately unsubscribable.');
+      });
+    },
+    error: t.fail
+  }).unsubscribe();
 
   const fail = t.fail.bind(t, 'Unexpectedly succeeded.');
 
@@ -344,4 +353,6 @@ const server = createServer((req, res) => {
       'should fail when `strip` option is a non-integer number.'
     )
   });
-}).on('end', () => server.close()));
+}));
+
+test.onFinish(() => server.close());

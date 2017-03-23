@@ -112,52 +112,57 @@ module.exports = function dlTar(url, dest, options) {
     const mapStream = options.mapStream || echo;
     const fileStreams = [];
     let ended = false;
+    let extractStream;
     let responseHeaders;
     let responseBytes = 0;
 
-    const extractStream = extract(dest, Object.assign({
-      fs: gracefulFs,
-      strip: 1
-    }, options, {
-      mapStream(fileStream, header) {
-        const newStream = mapStream(fileStream, header);
-
-        if (!isStream.readable(newStream)) {
-          extractStream.emit(
-            'error',
-            new TypeError(`${MAP_STREAM_ERROR}${
-              isStream(newStream) ?
-              ' that is readable, but returned a non-readable stream' :
-              `, but returned a non-stream value ${inspect(newStream)}`
-            }.`)
-          );
-
-          fileStreams.push(fileStream);
-          return new PassThrough();
-        }
-
-        let bytes = 0;
-        fileStreams.push(newStream);
-
-        return newStream.pipe(new Transform({
-          transform(chunk, encoding, cb) {
-            bytes += chunk.length;
-
-            observer.next({
-              entry: {header, bytes},
-              response: {
-                headers: responseHeaders,
-                bytes: responseBytes
-              }
-            });
-
-            cb(null, chunk);
-          }
-        }));
-      }
-    }));
-
     loadRequestFromCwdOrNpm().then(request => {
+      if (ended) {
+        return;
+      }
+
+      extractStream = extract(dest, Object.assign({
+        fs: gracefulFs,
+        strip: 1
+      }, options, {
+        mapStream(fileStream, header) {
+          const newStream = mapStream(fileStream, header);
+
+          if (!isStream.readable(newStream)) {
+            extractStream.emit(
+              'error',
+              new TypeError(`${MAP_STREAM_ERROR}${
+                isStream(newStream) ?
+                ' that is readable, but returned a non-readable stream' :
+                `, but returned a non-stream value ${inspect(newStream)}`
+              }.`)
+            );
+
+            fileStreams.push(fileStream);
+            return new PassThrough();
+          }
+
+          let bytes = 0;
+          fileStreams.push(newStream);
+
+          return newStream.pipe(new Transform({
+            transform(chunk, encoding, cb) {
+              bytes += chunk.length;
+
+              observer.next({
+                entry: {header, bytes},
+                response: {
+                  headers: responseHeaders,
+                  bytes: responseBytes
+                }
+              });
+
+              cb(null, chunk);
+            }
+          }));
+        }
+      }));
+
       const pipe = [
         request(Object.assign({url}, options, priorOption))
         .on('response', function(response) {
@@ -197,6 +202,11 @@ module.exports = function dlTar(url, dest, options) {
     });
 
     return function cancelExtract() {
+      if (!extractStream) {
+        ended = true;
+        return;
+      }
+
       if (ended) {
         return;
       }
