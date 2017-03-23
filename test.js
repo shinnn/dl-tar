@@ -149,6 +149,11 @@ const server = createServer((req, res) => {
 
   const fail = t.fail.bind(t, 'Unexpectedly succeeded.');
 
+  dlTar('http://localhost:3018', __filename).subscribe({
+    complete: fail,
+    error: ({code}) => t.strictEqual(code, 'EEXIST', 'should fail when it cannot write files.')
+  });
+
   dlTar('http://localhost:3018/non-tar', '__').subscribe({
     complete: fail,
     error: err => t.strictEqual(
