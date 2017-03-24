@@ -125,6 +125,8 @@ const server = createServer((req, res) => {
     }
   });
 
+  const fail = t.fail.bind(t, 'Unexpectedly succeeded.');
+
   const subscription = dlTar('/huge', 'tmp/c', {
     baseUrl: 'http://localhost:3018',
     tarTransform: createGunzip()
@@ -144,7 +146,8 @@ const server = createServer((req, res) => {
         await pathExists('tmp/c/rest.txt'),
         'should ignore unextracted entries after unsubscription.'
       );
-    }
+    },
+    complete: fail
   });
 
   dlTar('http://localhost:3018', __filename).subscribe({
@@ -153,10 +156,9 @@ const server = createServer((req, res) => {
         t.ok(subscriptionItself.closed, 'should be immediately unsubscribable.');
       });
     },
-    error: t.fail
+    error: t.fail,
+    complete: fail
   }).unsubscribe();
-
-  const fail = t.fail.bind(t, 'Unexpectedly succeeded.');
 
   dlTar('http://localhost:3018', __filename).subscribe({
     complete: fail,
