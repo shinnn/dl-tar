@@ -10,15 +10,14 @@ const stream = require('stream');
 const Transform = stream.Transform;
 const PassThrough = stream.PassThrough;
 
+const cancelablePump = require('cancelable-pump');
 const extract = require('tar-fs').extract;
 const gracefulFs = require('graceful-fs');
 const isPlainObj = require('is-plain-obj');
 const isStream = require('is-stream');
 const loadRequestFromCwdOrNpm = require('load-request-from-cwd-or-npm');
 const Observable = require('zen-observable');
-const pump = require('pump');
 
-const canceledError = new Error('Canceled.');
 const priorOption = {encoding: null};
 
 function echo(val) {
@@ -112,56 +111,55 @@ module.exports = function dlTar(url, dest, options) {
     const mapStream = options.mapStream || echo;
     const fileStreams = [];
     let ended = false;
-    let extractStream;
+    let cancel;
     let responseHeaders;
     let responseBytes = 0;
+
+    const extractStream = extract(dest, Object.assign({
+      fs: gracefulFs,
+      strip: 1
+    }, options, {
+      mapStream(fileStream, header) {
+        const newStream = mapStream(fileStream, header);
+
+        if (!isStream.readable(newStream)) {
+          extractStream.emit(
+            'error',
+            new TypeError(`${MAP_STREAM_ERROR}${
+              isStream(newStream) ?
+              ' that is readable, but returned a non-readable stream' :
+              `, but returned a non-stream value ${inspect(newStream)}`
+            }.`)
+          );
+
+          fileStreams.push(fileStream);
+          return new PassThrough();
+        }
+
+        let bytes = 0;
+        fileStreams.push(newStream);
+
+        return newStream.pipe(new Transform({
+          transform(chunk, encoding, cb) {
+            bytes += chunk.length;
+            cb(null, chunk);
+          }
+        })).on('finish', () => {
+          observer.next({
+            entry: {header, bytes},
+            response: {
+              headers: responseHeaders,
+              bytes: responseBytes
+            }
+          });
+        });
+      }
+    }));
 
     loadRequestFromCwdOrNpm().then(request => {
       if (ended) {
         return;
       }
-
-      extractStream = extract(dest, Object.assign({
-        fs: gracefulFs,
-        strip: 1
-      }, options, {
-        mapStream(fileStream, header) {
-          const newStream = mapStream(fileStream, header);
-
-          if (!isStream.readable(newStream)) {
-            extractStream.emit(
-              'error',
-              new TypeError(`${MAP_STREAM_ERROR}${
-                isStream(newStream) ?
-                ' that is readable, but returned a non-readable stream' :
-                `, but returned a non-stream value ${inspect(newStream)}`
-              }.`)
-            );
-
-            fileStreams.push(fileStream);
-            return new PassThrough();
-          }
-
-          let bytes = 0;
-          fileStreams.push(newStream);
-
-          return newStream.pipe(new Transform({
-            transform(chunk, encoding, cb) {
-              bytes += chunk.length;
-
-              observer.next({
-                entry: {header, bytes},
-                response: {
-                  headers: responseHeaders,
-                  bytes: responseBytes
-                }
-              });
-
-              cb(null, chunk);
-            }
-          }));
-        }
-      }));
 
       const pipe = [
         request(Object.assign({url}, options, priorOption))
@@ -186,10 +184,10 @@ module.exports = function dlTar(url, dest, options) {
         pipe.splice(2, 0, options.tarTransform);
       }
 
-      pump(pipe, err => {
+      cancel = cancelablePump(pipe, err => {
         ended = true;
 
-        if (err && err !== canceledError) {
+        if (err) {
           observer.error(err);
           return;
         }
@@ -202,7 +200,7 @@ module.exports = function dlTar(url, dest, options) {
     });
 
     return function cancelExtract() {
-      if (!extractStream) {
+      if (!cancel) {
         ended = true;
         return;
       }
@@ -211,7 +209,7 @@ module.exports = function dlTar(url, dest, options) {
         return;
       }
 
-      extractStream.emit('error', canceledError);
+      cancel();
     };
   });
 };
