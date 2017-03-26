@@ -56,7 +56,7 @@ const server = createServer((req, res) => {
   tar.finalize();
   tar.pipe(createGzip()).pipe(res);
 }).listen(3018, () => test('dlTar()', async t => {
-  t.plan(32);
+  t.plan(33);
 
   await rmfr('tmp').catch(t.fail);
 
@@ -264,6 +264,15 @@ const server = createServer((req, res) => {
       'TypeError: `tarTransform` option must be a transform stream that modifies ' +
       'the downloaded tar archive before extracting, but got a readable stream instead.',
       'should fail when `tarTransform` option is a non-transform stream.'
+    )
+  });
+
+  dlTar('http://localhost:3018/', '__', {map: new WeakSet()}).subscribe({
+    complete: fail,
+    error: err => t.strictEqual(
+      err.toString(),
+      'TypeError: `map` option must be a function, but got WeakSet {}.',
+      'should fail when `map` option is not a function.'
     )
   });
 

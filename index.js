@@ -13,11 +13,13 @@ const PassThrough = stream.PassThrough;
 const cancelablePump = require('cancelable-pump');
 const extract = require('tar-fs').extract;
 const gracefulFs = require('graceful-fs');
+const inspectWithKind = require('inspect-with-kind');
 const isPlainObj = require('is-plain-obj');
 const isStream = require('is-stream');
 const loadRequestFromCwdOrNpm = require('load-request-from-cwd-or-npm');
 const Observable = require('zen-observable');
 
+const functionOptions = new Set(['map', 'mapStream']);
 const priorOption = {encoding: null};
 
 function echo(val) {
@@ -70,20 +72,14 @@ module.exports = function dlTar(url, dest, options) {
       }
     }
 
-    if (options.tarTransform !== undefined) {
-      if (!isStream(options.tarTransform)) {
-        throw new TypeError(`${TAR_TRANSFORM_ERROR}, but got a non-stream value ${inspect(options.tarTransform)}.`);
-      }
+    for (const optionName of functionOptions) {
+      const val = options[optionName];
 
-      if (!isStream.transform(options.tarTransform)) {
-        throw new TypeError(`${TAR_TRANSFORM_ERROR}, but got a ${
-          ['duplex', 'writable', 'readable'].find(type => isStream[type](options.tarTransform))
-        } stream instead.`);
+      if (val !== undefined && typeof val !== 'function') {
+        throw new TypeError(`\`${optionName}\` option must be a function, but got ${
+          inspectWithKind(val)
+        }.`);
       }
-    }
-
-    if (options.mapStream !== undefined && typeof options.mapStream !== 'function') {
-      throw new TypeError(`\`mapStream\` option must be a function, but got ${inspect(options.mapStream)}.`);
     }
 
     if (options.strip !== undefined) {
@@ -105,6 +101,18 @@ module.exports = function dlTar(url, dest, options) {
 
       if (!Number.isInteger(options.strip)) {
         throw new Error(`${STRIP_ERROR}, but got a non-integer number ${options.strip}.`);
+      }
+    }
+
+    if (options.tarTransform !== undefined) {
+      if (!isStream(options.tarTransform)) {
+        throw new TypeError(`${TAR_TRANSFORM_ERROR}, but got a non-stream value ${inspect(options.tarTransform)}.`);
+      }
+
+      if (!isStream.transform(options.tarTransform)) {
+        throw new TypeError(`${TAR_TRANSFORM_ERROR}, but got a ${
+          ['duplex', 'writable', 'readable'].find(type => isStream[type](options.tarTransform))
+        } stream instead.`);
       }
     }
 
