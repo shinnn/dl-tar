@@ -119,7 +119,7 @@ dlTar('https://****.org/my-archive.tar', 'my/dir')
 
 Type: `Object {bytes: <Number>, headers: <Object>}`
 
-`response.headers` is a [response header object](https://nodejs.org/api/http.html#http_message_headers) derived from [`http.IncomingMessage`](https://nodejs.org/api/http.html#http_class_http_incomingmessage), and `response.bytes` is a total content length of the downloaded archive.
+`response.headers` is a [response header object](https://nodejs.org/api/http.html#http_message_headers) derived from [`http.IncomingMessage`](https://nodejs.org/api/http.html#http_class_http_incomingmessage), and `response.bytes` is a total content length of the downloaded archive. `content-length` header will be converted to `Number` if it is `String`.
 
 #### Options
 

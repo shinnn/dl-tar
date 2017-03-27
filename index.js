@@ -227,7 +227,10 @@ module.exports = function dlTar(url, dest, options) {
             return;
           }
 
-          responseHeaders = response.headers;
+          if (typeof response.headers['content-length'] === 'string') {
+            response.headers['content-length'] = Number(response.headers['content-length']);
+          }
+
           extractStream.responseHeaders = response.headers;
         }),
         new Transform({

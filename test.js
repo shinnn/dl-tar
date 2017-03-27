@@ -121,6 +121,11 @@ const server = createServer((req, res) => {
           'should send response headers to the subscription.'
         );
 
+        t.strictEqual(
+          progress.response.headers['content-length'],
+          4096,
+          'should convert `content-length` header from string to number.'
+        );
       }
     },
     async complete() {
