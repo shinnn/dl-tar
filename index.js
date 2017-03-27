@@ -150,6 +150,17 @@ module.exports = function dlTar(url, dest, options) {
         return newStream.pipe(new Transform({
           transform(chunk, encoding, cb) {
             bytes += chunk.length;
+
+            if (bytes !== header.size) {
+              observer.next({
+                entry: {header, bytes},
+                response: {
+                  headers: responseHeaders,
+                  bytes: responseBytes
+                }
+              });
+            }
+
             cb(null, chunk);
           }
         })).on('finish', () => {

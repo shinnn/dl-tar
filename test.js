@@ -106,7 +106,7 @@ const server = createServer((req, res) => {
     mapStream(stream, header) {
       return stream.pipe(new Transform({
         transform(data, enc, cb) {
-          cb(null, `${'>'.repeat(header.size)}${data}`);
+          cb(null, `${data.length / header.size * 100} %`);
         }
       }));
     },
@@ -120,7 +120,7 @@ const server = createServer((req, res) => {
         pathExists('tmp/b/prefix-dir/nested/1.txt')
       ]).catch(t.fail);
 
-      t.strictEqual(content, '>>>>>Hello', 'should support tar-fs options.');
+      t.strictEqual(content, '100 %', 'should support tar-fs options.');
       t.notOk(ignoredFileExists, 'should leave ignored files unextracted.');
     }
   });
