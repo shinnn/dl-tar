@@ -1,6 +1,6 @@
 {
   "name": "dl-tar",
-  "version": "0.2.4",
+  "version": "0.3.0",
   "description": "Download and extract a tar archive with the Observable API",
   "repository": "shinnn/dl-tar",
   "author": "Shinnosuke Watanabe (https://github.com/shinnn)",
@@ -29,7 +29,7 @@
     "observable"
   ],
   "dependencies": {
-    "cancelable-pump": "0.0.0",
+    "cancelable-pump": "^0.2.0",
     "graceful-fs": "^4.1.11",
     "inspect-with-kind": "^1.0.0",
     "is-plain-obj": "^1.1.0",
