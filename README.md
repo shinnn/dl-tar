@@ -37,6 +37,7 @@ dlTar(url, 'my/dir').subscribe({
 ```
 
 ```
+✓ bin/
 ✓ bin/app.exe
 ✓ README.md
 ✓ LICENSE
@@ -80,12 +81,14 @@ Every progress object have two properties `entry` and `response`.
 
 Type: `Object {bytes: <Number>, header: <Object>}`
 
-`entry.bytes` is the total size of currently extracted entry, and `entry.header` is [a header of the entry](https://github.com/mafintosh/tar-stream#headers).
+`entry.header` is [a header of the entry](https://github.com/mafintosh/tar-stream#headers), and `entry.bytes` is the total size of currently extracted entry. `bytes` is always `0` if the entry is not a file but directory, link or symlink.
 
-For example you can get the progress of each entry as a percentage by `progress.entry.bytes / progress.entry.header.size * 100`.
+For example you can get the progress of each entry as a percentage by `(progress.entry.bytes / progress.entry.header.size || 0) * 100`.
 
 ```javascript
-dlTar('https://****.org/my-archive.tar', 'my/dir').subscribe(progress => {
+dlTar('https://****.org/my-archive.tar', 'my/dir')
+.filter(progress => progress.entry.header.type === 'file')
+.subscribe(progress => {
   console.log(`${(progress.entry.bytes / progress.entry.header.size * 100).toFixed(1)} %`);
 
   if (progress.entry.bytes === progress.entry.header.size) {
@@ -95,6 +98,7 @@ dlTar('https://****.org/my-archive.tar', 'my/dir').subscribe(progress => {
 ```
 
 ```
+0.0 %
 0.1 %
 0.3 %
 0.4 %
@@ -104,6 +108,7 @@ dlTar('https://****.org/my-archive.tar', 'my/dir').subscribe(progress => {
 99.9 %
 100.0 %
 >> OK bin/app.exe
+0.0 %
 0.1 %
 0.2 %
 0.3 %

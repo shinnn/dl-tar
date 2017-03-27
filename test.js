@@ -35,10 +35,13 @@ const server = createServer((req, res) => {
   const tar = pack();
 
   if (req.url === '/') {
-    res.setHeader('content-type', 'application/x-tar');
+    tar.entry({name: 'dir', type: 'directory'});
     tar.entry({name: 'dir/1.txt'}, 'Hi');
     tar.entry({name: 'dir/nested/2.txt'}, 'Hello');
+    tar.entry({name: 'dir/empty.txt'}, '');
     tar.finalize();
+    res.setHeader('content-type', 'application/x-tar');
+    res.setHeader('content-length', `${tar._readableState.length}`); // eslint-disable-line
     tar.pipe(res);
 
     return;
@@ -56,7 +59,7 @@ const server = createServer((req, res) => {
   tar.finalize();
   tar.pipe(createGzip()).pipe(res);
 }).listen(3018, () => test('dlTar()', async t => {
-  t.plan(33);
+  t.plan(38);
 
   await rmfr('tmp').catch(t.fail);
 
@@ -65,27 +68,60 @@ const server = createServer((req, res) => {
 
   dlTar('http://localhost:3018/', 'tmp/a').subscribe({
     next(progress) {
-      if (progress.entry.header.name === '1.txt') {
-        t.strictEqual(progress.entry.bytes, 2, 'should send download progress to the subscription.');
+      if (progress.entry.header.name === '') {
+        t.strictEqual(
+          progress.entry.header.type,
+          'directory',
+          'should send progress when a directory is created.'
+        );
+        t.strictEqual(
+          progress.entry.bytes,
+          0,
+          'should consider the size of directory as 0.'
+        );
+
         return;
       }
 
-      t.strictEqual(
-        progress.entry.header.name,
-        'nested/2.txt',
-        'should send entry headers to the subscription.'
-      );
+      if (progress.entry.header.name === '1.txt') {
+        if (progress.entry.bytes === 0) {
+          t.pass('should notify the beginning of extraction to the subscription.');
+        } else if (progress.entry.bytes === 2) {
+          t.pass('should notify the ending of extraction to the subscription.');
+        }
 
-      t.ok(
-        Number.isSafeInteger(progress.response.bytes),
-        'should send total donwload bytes to the subscription.'
-      );
+        return;
+      }
 
-      t.strictEqual(
-        progress.response.headers['content-type'],
-        'application/x-tar',
-        'should send response headers to the subscription.'
-      );
+      if (progress.entry.header.name === 'empty.txt') {
+        t.strictEqual(
+          progress.entry.bytes,
+          0,
+          'should send extraction progress even if the file is 0 byte.'
+        );
+
+        return;
+      }
+
+      if (progress.entry.bytes === 0) {
+        t.strictEqual(
+          progress.entry.header.name,
+          'nested/2.txt',
+          'should send entry headers to the subscription.'
+        );
+
+        t.ok(
+          Number.isSafeInteger(progress.response.bytes),
+          'should send total donwload bytes to the subscription.'
+        );
+
+        t.strictEqual(
+          progress.response.headers['content-type'],
+          'application/x-tar',
+          'should send response headers to the subscription.'
+        );
+
+      }
     },
     async complete() {
       const contents = await Promise.all([

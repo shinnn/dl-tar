@@ -11,13 +11,50 @@ const Transform = stream.Transform;
 const PassThrough = stream.PassThrough;
 
 const cancelablePump = require('cancelable-pump');
-const extract = require('tar-fs').extract;
+const fsExtract = require('tar-fs').extract;
 const gracefulFs = require('graceful-fs');
 const inspectWithKind = require('inspect-with-kind');
 const isPlainObj = require('is-plain-obj');
 const isStream = require('is-stream');
 const loadRequestFromCwdOrNpm = require('load-request-from-cwd-or-npm');
 const Observable = require('zen-observable');
+const OriginalExtract = require('tar-stream').extract;
+
+class Extract extends OriginalExtract {
+  constructor(observer) {
+    super();
+
+    this.observer = observer;
+    this.responseHeaders = null;
+    this.responseBytes = 0;
+  }
+  emit(eventName, val0, val1, originalNext) {
+    if (eventName !== 'entry') {
+      super.emit(eventName, val0);
+      return;
+    }
+
+    super.emit('entry', val0, val1, err => {
+      if (err) {
+        originalNext(err);
+        return;
+      }
+
+      this.observer.next({
+        entry: {
+          header: val0,
+          bytes: val0.size
+        },
+        response: {
+          headers: this.responseHeaders,
+          bytes: this.responseBytes
+        }
+      });
+
+      originalNext();
+    });
+  }
+}
 
 const functionOptions = new Set(['map', 'mapStream']);
 const priorOption = {encoding: null};
@@ -116,14 +153,14 @@ module.exports = function dlTar(url, dest, options) {
       }
     }
 
+    const extractStream = new Extract(observer);
     const mapStream = options.mapStream || echo;
     const fileStreams = [];
     let ended = false;
     let cancel;
-    let responseHeaders;
-    let responseBytes = 0;
 
-    const extractStream = extract(dest, Object.assign({
+    const fsExtractStream = fsExtract(dest, Object.assign({
+      extract: extractStream,
       fs: gracefulFs,
       strip: 1
     }, options, {
@@ -131,7 +168,7 @@ module.exports = function dlTar(url, dest, options) {
         const newStream = mapStream(fileStream, header);
 
         if (!isStream.readable(newStream)) {
-          extractStream.emit(
+          fsExtractStream.emit(
             'error',
             new TypeError(`${MAP_STREAM_ERROR}${
               isStream(newStream) ?
@@ -147,6 +184,16 @@ module.exports = function dlTar(url, dest, options) {
         let bytes = 0;
         fileStreams.push(newStream);
 
+        if (header.size !== 0) {
+          observer.next({
+            entry: {header, bytes},
+            response: {
+              headers: extractStream.responseHeaders,
+              bytes: extractStream.responseBytes
+            }
+          });
+        }
+
         return newStream.pipe(new Transform({
           transform(chunk, encoding, cb) {
             bytes += chunk.length;
@@ -155,23 +202,15 @@ module.exports = function dlTar(url, dest, options) {
               observer.next({
                 entry: {header, bytes},
                 response: {
-                  headers: responseHeaders,
-                  bytes: responseBytes
+                  headers: extractStream.responseHeaders,
+                  bytes: extractStream.responseBytes
                 }
               });
             }
 
             cb(null, chunk);
           }
-        })).on('finish', () => {
-          observer.next({
-            entry: {header, bytes},
-            response: {
-              headers: responseHeaders,
-              bytes: responseBytes
-            }
-          });
-        });
+        }));
       }
     }));
 
@@ -189,14 +228,15 @@ module.exports = function dlTar(url, dest, options) {
           }
 
           responseHeaders = response.headers;
+          extractStream.responseHeaders = response.headers;
         }),
         new Transform({
           transform(chunk, encoding, cb) {
-            responseBytes += chunk.length;
+            extractStream.responseBytes += chunk.length;
             cb(null, chunk);
           }
         }),
-        extractStream
+        fsExtractStream
       ];
 
       if (options.tarTransform) {
