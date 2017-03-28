@@ -42,6 +42,7 @@
     "@shinnn/eslint-config-node": "^3.0.0",
     "clear-require": "^2.0.0",
     "eslint": "^3.18.0",
+    "nop": "^1.0.0",
     "nyc": "^10.1.2",
     "path-exists": "^3.0.0",
     "read-utf8-file": "^1.0.0",
