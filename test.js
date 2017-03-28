@@ -2,6 +2,7 @@
 
 const {createServer} = require('http');
 const {createGunzip, createGzip} = require('zlib');
+const {normalize} = require('path');
 const {Transform} = require('stream');
 
 const clearRequire = require('clear-require');
@@ -152,7 +153,7 @@ const server = createServer((req, res) => {
       }));
     },
     ignore(file) {
-      return file === 'tmp/b/dir/1.txt';
+      return file === normalize('tmp/b/dir/1.txt');
     }
   }).subscribe({
     async complete() {
