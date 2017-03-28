@@ -59,7 +59,7 @@ const server = createServer((req, res) => {
   tar.finalize();
   tar.pipe(createGzip()).pipe(res);
 }).listen(3018, () => test('dlTar()', async t => {
-  t.plan(38);
+  t.plan(39);
 
   await rmfr('tmp').catch(t.fail);
 
@@ -152,13 +152,13 @@ const server = createServer((req, res) => {
       }));
     },
     ignore(file) {
-      return file === 'tmp/b/prefix-dir/1.txt';
+      return file === 'tmp/b/dir/1.txt';
     }
   }).subscribe({
     async complete() {
       const [content, ignoredFileExists] = await Promise.all([
         readUtf8File('tmp/b/prefix-dir/nested/2.txt'),
-        pathExists('tmp/b/prefix-dir/nested/1.txt')
+        pathExists('tmp/b/prefix-dir/1.txt')
       ]).catch(t.fail);
 
       t.strictEqual(content, '100 %', 'should support tar-fs options.');
@@ -305,6 +305,15 @@ const server = createServer((req, res) => {
       'TypeError: `tarTransform` option must be a transform stream that modifies ' +
       'the downloaded tar archive before extracting, but got a readable stream instead.',
       'should fail when `tarTransform` option is a non-transform stream.'
+    )
+  });
+
+  dlTar('http://localhost:3018/', '__', {ignore: /^/}).subscribe({
+    complete: fail,
+    error: err => t.strictEqual(
+      err.toString(),
+      'TypeError: `ignore` option must be a function, but got /^/ (regexp).',
+      'should fail when `map` option is not a function.'
     )
   });
 

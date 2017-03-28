@@ -5,12 +5,14 @@
 'use strict';
 
 const inspect = require('util').inspect;
-const stream = require('stream');
+const join = require('path').join;
+const streamLib = require('stream');
 
-const Transform = stream.Transform;
-const PassThrough = stream.PassThrough;
+const Transform = streamLib.Transform;
+const PassThrough = streamLib.PassThrough;
 
 const cancelablePump = require('cancelable-pump');
+const Extract = require('tar-stream').extract;
 const fsExtract = require('tar-fs').extract;
 const gracefulFs = require('graceful-fs');
 const inspectWithKind = require('inspect-with-kind');
@@ -18,23 +20,31 @@ const isPlainObj = require('is-plain-obj');
 const isStream = require('is-stream');
 const loadRequestFromCwdOrNpm = require('load-request-from-cwd-or-npm');
 const Observable = require('zen-observable');
-const OriginalExtract = require('tar-stream').extract;
 
-class Extract extends OriginalExtract {
-  constructor(observer) {
+class InternalExtract extends Extract {
+  constructor(options) {
     super();
 
-    this.observer = observer;
+    this.cwd = options.cwd;
+    this.ignore = options.ignore;
+    this.observer = options.observer;
     this.responseHeaders = null;
     this.responseBytes = 0;
   }
-  emit(eventName, val0, val1, originalNext) {
+  emit(eventName, header, stream, originalNext) {
     if (eventName !== 'entry') {
-      super.emit(eventName, val0);
+      super.emit(eventName, header);
       return;
     }
 
-    super.emit('entry', val0, val1, err => {
+    if (this.ignore && this.ignore(join(this.cwd, join('/', header.name)), header)) {
+      stream.resume();
+      originalNext();
+
+      return;
+    }
+
+    super.emit('entry', header, stream, err => {
       if (err) {
         originalNext(err);
         return;
@@ -42,8 +52,8 @@ class Extract extends OriginalExtract {
 
       this.observer.next({
         entry: {
-          header: val0,
-          bytes: val0.size
+          header,
+          bytes: header.size
         },
         response: {
           headers: this.responseHeaders,
@@ -56,8 +66,9 @@ class Extract extends OriginalExtract {
   }
 }
 
-const functionOptions = new Set(['map', 'mapStream']);
-const priorOption = {encoding: null};
+const functionOptions = new Set(['ignore', 'map', 'mapStream']);
+const priorRequestOption = {encoding: null};
+const priorTarFsOption = {ignore: null};
 
 function echo(val) {
   return val;
@@ -153,7 +164,11 @@ module.exports = function dlTar(url, dest, options) {
       }
     }
 
-    const extractStream = new Extract(observer);
+    const extractStream = new InternalExtract({
+      cwd: dest,
+      ignore: options.ignore,
+      observer
+    });
     const mapStream = options.mapStream || echo;
     const fileStreams = [];
     let ended = false;
@@ -212,7 +227,7 @@ module.exports = function dlTar(url, dest, options) {
           }
         }));
       }
-    }));
+    }, priorTarFsOption));
 
     loadRequestFromCwdOrNpm().then(request => {
       if (ended) {
@@ -220,7 +235,7 @@ module.exports = function dlTar(url, dest, options) {
       }
 
       const pipe = [
-        request(Object.assign({url}, options, priorOption))
+        request(Object.assign({url}, options, priorRequestOption))
         .on('response', function(response) {
           if (response.statusCode < 200 || 299 < response.statusCode) {
             this.emit('error', new Error(`${response.statusCode} ${response.statusMessage}`));

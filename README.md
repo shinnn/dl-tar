@@ -125,6 +125,7 @@ Type: `Object {bytes: <Number>, headers: <Object>}`
 
 You can pass options to [Request](https://github.com/request/request#requestoptions-callback) and [tar-fs](https://github.com/mafintosh/tar-fs)'s [`extract` method](https://github.com/mafintosh/tar-fs/blob/12968d9f650b07b418d348897cd922e2b27ec18c/index.js#L167). Note that:
 
+* [`ignore` option](https://github.com/mafintosh/tar-fs/blob/b79d82a79c5e21f6187462d7daaba1fc03cdd1de/index.js#L236) is applied before [`map` option](https://github.com/mafintosh/tar-fs/blob/b79d82a79c5e21f6187462d7daaba1fc03cdd1de/index.js#L232) modifies filenames.
 * [`strip` option](https://github.com/mafintosh/tar-fs/blob/12968d9f650b07b418d348897cd922e2b27ec18c/index.js#L47) defaults to `1`, not `0`. That means the top level directory is stripped off by default.
 * [`fs`](https://github.com/mafintosh/tar-fs/blob/e59deed830fded0e4e5beb016d2df9c7054bb544/index.js#L65) option defaults to [graceful-fs](https://github.com/isaacs/node-graceful-fs) for more stability.
 
