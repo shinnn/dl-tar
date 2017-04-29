@@ -49,6 +49,17 @@ const server = createServer((req, res) => {
     return;
   }
 
+  if (req.url === '/eisdir') {
+    tar.entry({name: 'dir', type: 'directory'});
+    tar.entry({name: 'dir/node_modules'}, 'Hi');
+    tar.finalize();
+    res.setHeader('content-type', 'application/x-tar');
+    res.setHeader('content-length', `${tar._readableState.length}`); // eslint-disable-line
+    tar.pipe(res);
+
+    return;
+  }
+
   if (req.url === '/non-tar') {
     res.setHeader('content-Type', 'text/plain');
     res.end('plain text'.repeat(100));
@@ -62,7 +73,7 @@ const server = createServer((req, res) => {
   tar.pipe(createGzip()).pipe(res);
 }).listen(3018, () => {
   test('dlTar()', async t => {
-    t.plan(19);
+    t.plan(20);
 
     clearRequire.all();
     const dlTar = require('.');
@@ -206,7 +217,14 @@ const server = createServer((req, res) => {
 
     dlTar('http://localhost:3018', __filename).subscribe({
       complete: fail,
-      error: ({code}) => t.strictEqual(code, 'EEXIST', 'should fail when it cannot write files.')
+      error: ({code}) => t.strictEqual(code, 'EEXIST', 'should fail when it cannot create directories.')
+    });
+
+    dlTar('http://localhost:3018/eisdir', __dirname).subscribe({
+      error({code}) {
+        t.strictEqual(code, 'EISDIR', 'should fail when it cannot write files.');
+      },
+      complete: fail
     });
 
     dlTar('http://localhost:3018/non-tar', '__').subscribe({

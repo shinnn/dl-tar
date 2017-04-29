@@ -21,6 +21,12 @@ const isStream = require('is-stream');
 const loadRequestFromCwdOrNpm = require('load-request-from-cwd-or-npm');
 const Observable = require('zen-observable');
 
+class DestroyableTransform extends Transform {
+  destroy() {
+    super.unpipe();
+  }
+}
+
 class InternalExtract extends Extract {
   constructor(options) {
     super();
@@ -209,7 +215,7 @@ module.exports = function dlTar(url, dest, options) {
           });
         }
 
-        return newStream.pipe(new Transform({
+        return newStream.pipe(new DestroyableTransform({
           transform(chunk, encoding, cb) {
             bytes += chunk.length;
 
