@@ -69,9 +69,9 @@ const dlTar = require('dl-tar');
 *options*: `Object`  
 Return: [`Observable`](https://tc39.github.io/proposal-observable/#observable) ([zenparsing's implementation](https://github.com/zenparsing/zen-observable))
 
-When the [observable](https://github.com/tc39/proposal-observable#observable) is [subscribe](https://tc39.github.io/proposal-observable/#observable-prototype-subscribe)d, it starts to download the tar archive, extract it and successively send extraction progress to its [observer](https://github.com/tc39/proposal-observable#observer).
+When the `Observable` is [subscribe](https://tc39.github.io/proposal-observable/#observable-prototype-subscribe)d, it starts to download the tar archive, extract it and successively send extraction progress to its [`Observer`](https://github.com/tc39/proposal-observable#observer).
 
-When the [subscription](https://tc39.github.io/proposal-observable/#subscription-objects) is [unsubscribe](https://tc39.github.io/proposal-observable/#subscription-prototype-unsubscribe)d, it stops downloading and extracting.
+When the [`Subscription`](https://tc39.github.io/proposal-observable/#subscription-objects) is [unsubscribe](https://tc39.github.io/proposal-observable/#subscription-prototype-unsubscribe)d, it stops downloading and extracting.
 
 #### Progress
 
@@ -79,7 +79,7 @@ Every progress object have two properties `entry` and `response`.
 
 ##### entry
 
-Type: `Object {bytes: <Number>, header: <Object>}`
+Type: `Object {bytes: <number>, header: <Object>}`
 
 `entry.header` is [a header of the entry](https://github.com/mafintosh/tar-stream#headers), and `entry.bytes` is the total size of currently extracted entry. `bytes` is always `0` if the entry is not a file but directory, link or symlink.
 
@@ -117,9 +117,9 @@ dlTar('https://****.org/my-archive.tar', 'my/dir')
 
 ##### response
 
-Type: `Object {bytes: <Number>, headers: <Object>}`
+Type: `Object {bytes: <number>, headers: <Object>, url: <string>}`
 
-`response.headers` is a [response header object](https://nodejs.org/api/http.html#http_message_headers) derived from [`http.IncomingMessage`](https://nodejs.org/api/http.html#http_class_http_incomingmessage), and `response.bytes` is a total content length of the downloaded archive. `content-length` header will be converted to `Number` if it is `String`.
+`response.url` is the final redirected URL of the request, `response.headers` is a [response header object](https://nodejs.org/api/http.html#http_message_headers) derived from [`http.IncomingMessage`](https://nodejs.org/api/http.html#http_class_http_incomingmessage), and `response.bytes` is a total content length of the downloaded archive. `content-length` header will be converted to `Number` if it is `String`.
 
 #### Options
 

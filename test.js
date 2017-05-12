@@ -73,7 +73,7 @@ const server = createServer((req, res) => {
   tar.pipe(createGzip()).pipe(res);
 }).listen(3018, () => {
   test('dlTar()', async t => {
-    t.plan(20);
+    t.plan(21);
 
     clearRequire.all();
     const dlTar = require('.');
@@ -99,9 +99,9 @@ const server = createServer((req, res) => {
 
         if (progress.entry.header.name === '1.txt') {
           if (progress.entry.bytes === 0) {
-            t.pass('should notify the beginning of extraction to the subscription.');
+            t.pass('should notify the beginning of extraction to the observer.');
           } else if (progress.entry.bytes === 2) {
-            t.pass('should notify the ending of extraction to the subscription.');
+            t.pass('should notify the ending of extraction to the observer.');
           }
 
           return;
@@ -121,18 +121,24 @@ const server = createServer((req, res) => {
           t.strictEqual(
             progress.entry.header.name,
             'nested/2.txt',
-            'should send entry headers to the subscription.'
+            'should send entry headers to the observer.'
+          );
+
+          t.strictEqual(
+            progress.response.url,
+            'http://localhost:3018/',
+            'should send the request URL to the observer.'
           );
 
           t.ok(
             Number.isSafeInteger(progress.response.bytes),
-            'should send total donwload bytes to the subscription.'
+            'should send total donwload bytes to the observer.'
           );
 
           t.strictEqual(
             progress.response.headers['content-type'],
             'application/x-tar',
-            'should send response headers to the subscription.'
+            'should send response headers to the observer.'
           );
 
           t.strictEqual(

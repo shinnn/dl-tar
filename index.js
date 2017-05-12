@@ -34,6 +34,7 @@ class InternalExtract extends Extract {
     this.cwd = options.cwd;
     this.ignore = options.ignore;
     this.observer = options.observer;
+    this.url = '';
     this.responseHeaders = null;
     this.responseBytes = 0;
   }
@@ -62,6 +63,7 @@ class InternalExtract extends Extract {
           bytes: header.size
         },
         response: {
+          url: this.url,
           headers: this.responseHeaders,
           bytes: this.responseBytes
         }
@@ -209,6 +211,7 @@ module.exports = function dlTar(url, dest, options) {
           observer.next({
             entry: {header, bytes},
             response: {
+              url: extractStream.url,
               headers: extractStream.responseHeaders,
               bytes: extractStream.responseBytes
             }
@@ -223,6 +226,7 @@ module.exports = function dlTar(url, dest, options) {
               observer.next({
                 entry: {header, bytes},
                 response: {
+                  url: extractStream.url,
                   headers: extractStream.responseHeaders,
                   bytes: extractStream.responseBytes
                 }
@@ -252,6 +256,7 @@ module.exports = function dlTar(url, dest, options) {
             response.headers['content-length'] = Number(response.headers['content-length']);
           }
 
+          extractStream.url = response.request.uri.href;
           extractStream.responseHeaders = response.headers;
         }),
         new Transform({
