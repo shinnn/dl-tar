@@ -195,8 +195,8 @@ module.exports = function dlTar(url, dest, options) {
             'error',
             new TypeError(`${MAP_STREAM_ERROR}${
               isStream(newStream) ?
-              ' that is readable, but returned a non-readable stream' :
-              `, but returned a non-stream value ${inspect(newStream)}`
+                ' that is readable, but returned a non-readable stream' :
+                `, but returned a non-stream value ${inspect(newStream)}`
             }.`)
           );
 
