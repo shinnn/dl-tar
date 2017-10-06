@@ -5,7 +5,7 @@ const {createGunzip, createGzip} = require('zlib');
 const {normalize} = require('path');
 const {Transform} = require('stream');
 
-const clearRequire = require('clear-require');
+const clearAllModules = require('clear-module').all;
 const {pack} = require('tar-stream');
 const noop = require('nop');
 const pathExists = require('path-exists');
@@ -75,7 +75,7 @@ const server = createServer((req, res) => {
   test('dlTar()', async t => {
     t.plan(21);
 
-    clearRequire.all();
+    clearAllModules();
     const dlTar = require('.');
 
     await rmfr('tmp').catch(t.fail);

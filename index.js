@@ -119,12 +119,9 @@ module.exports = function dlTar(url, dest, options) {
       const formattedMethod = inspect(options.method);
 
       if (formattedMethod.toLowerCase() !== '\'get\'') {
-        throw new (typeof options.method === 'string' ? Error : TypeError)(
-          'Invalid `method` option: ' +
-          formattedMethod +
-          '. `dl-tar` module is designed to download archive files. ' +
-          'So it only supports the default request method "GET" and it cannot be overridden by `method` option.'
-        );
+        throw new (typeof options.method === 'string' ? Error : TypeError)(`Invalid \`method\` option: ${
+          formattedMethod
+        }. \`dl-tar\` module is designed to download archive files. So it only supports the default request method "GET" and it cannot be overridden by \`method\` option.`);
       }
     }
 
