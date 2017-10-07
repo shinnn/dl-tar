@@ -150,6 +150,4 @@ const observable = dlTar('https://github.com/nodejs/node/archive/master.tar.gz',
 
 ## License
 
-Copyright (c) 2017 [Shinnosuke Watanabe](https://github.com/shinnn)
-
-Licensed under [the MIT License](./LICENSE).
+[ISC License](./LICENSE) © 2017 Shinnosuke Watanabe
