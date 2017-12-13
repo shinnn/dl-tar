@@ -1,6 +1,6 @@
 # dl-tar
 
-[![NPM version](https://img.shields.io/npm/v/dl-tar.svg)](https://www.npmjs.com/package/dl-tar)
+[![npm version](https://img.shields.io/npm/v/dl-tar.svg)](https://www.npmjs.com/package/dl-tar)
 [![Build Status](https://travis-ci.org/shinnn/dl-tar.svg?branch=master)](https://travis-ci.org/shinnn/dl-tar)
 [![Build status](https://ci.appveyor.com/api/projects/status/83sbr9dtbp3hreoy/branch/master?svg=true)](https://ci.appveyor.com/project/ShinnosukeWatanabe/dl-tar/branch/master)
 [![Coverage Status](https://img.shields.io/coveralls/shinnn/dl-tar.svg)](https://coveralls.io/github/shinnn/dl-tar?branch=master)
