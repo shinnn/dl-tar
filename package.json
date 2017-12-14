@@ -1,6 +1,6 @@
 {
 	"name": "dl-tar",
-	"version": "0.5.2",
+	"version": "0.5.3",
 	"description": "Download and extract a tar archive with the Observable API",
 	"repository": "shinnn/dl-tar",
 	"author": "Shinnosuke Watanabe (https://github.com/shinnn)",
