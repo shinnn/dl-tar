@@ -267,6 +267,18 @@ const server = createServer((req, res) => {
 		}
 
 		t.equal(
+			await getError(),
+			'RangeError: Expected 2 or 3 arguments (<string>, <string>[, <Object>]), but got no arguments instead.',
+			'should fail when no argument is passed.'
+		);
+
+		t.equal(
+			await getError('', '', {}, {}),
+			'RangeError: Expected 2 or 3 arguments (<string>, <string>[, <Object>]), but got 4 arguments instead.',
+			'should fail when too many argument are passed.'
+		);
+
+		t.equal(
 			await getError(Math.sign, '__'),
 			'TypeError: Expected a URL of tar archive, but got [Function: sign].',
 			'should fail when the URL is not a string.'

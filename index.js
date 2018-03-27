@@ -1,7 +1,7 @@
 'use strict';
 
-const inspect = require('util').inspect;
-const join = require('path').join;
+const {inspect} = require('util');
+const {join} = require('path');
 const streamLib = require('stream');
 
 const Transform = streamLib.Transform;
@@ -86,7 +86,17 @@ const MAP_STREAM_ERROR = 'The function passed to `mapStream` option must return 
 const STRIP_ERROR = 'Expected `strip` option to be a non-negative integer (0, 1, ...) ' +
                     'that specifies how many leading components from file names will be stripped';
 
-module.exports = function dlTar(url, dest, options) {
+module.exports = function dlTar(...args) {
+	const argLen = args.length;
+
+	if (argLen !== 2 && argLen !== 3) {
+		throw new RangeError(`Expected 2 or 3 arguments (<string>, <string>[, <Object>]), but got ${
+			argLen === 0 ? 'no' : argLen
+		} arguments instead.`);
+	}
+
+	const [url, dest] = args;
+
 	return new Observable(observer => {
 		if (typeof url !== 'string') {
 			throw new TypeError(`Expected a URL of tar archive, but got ${inspect(url)}.`);
@@ -104,65 +114,65 @@ module.exports = function dlTar(url, dest, options) {
 			throw new Error(`${DEST_ERROR}, but got '' (empty string).`);
 		}
 
-		if (options !== undefined) {
+		const options = argLen === 3 ? args[2] : {};
+
+		if (argLen === 3) {
 			if (!isPlainObj(options)) {
 				throw new TypeError(`Expected an object to specify \`dl-tar\` options, but got ${inspect(options)}.`);
 			}
-		} else {
-			options = {};
-		}
 
-		if (options.method) {
-			const formattedMethod = inspect(options.method);
+			if (options.method) {
+				const formattedMethod = inspect(options.method);
 
-			if (formattedMethod.toLowerCase() !== '\'get\'') {
-				throw new (typeof options.method === 'string' ? Error : TypeError)(`Invalid \`method\` option: ${
-					formattedMethod
-				}. \`dl-tar\` module is designed to download archive files. So it only supports the default request method "GET" and it cannot be overridden by \`method\` option.`);
-			}
-		}
-
-		for (const optionName of functionOptions) {
-			const val = options[optionName];
-
-			if (val !== undefined && typeof val !== 'function') {
-				throw new TypeError(`\`${optionName}\` option must be a function, but got ${
-					inspectWithKind(val)
-				}.`);
-			}
-		}
-
-		if (options.strip !== undefined) {
-			if (typeof options.strip !== 'number') {
-				throw new TypeError(`${STRIP_ERROR}, but got a non-number value ${inspect(options.strip)}.`);
+				if (formattedMethod.toLowerCase() !== '\'get\'') {
+					throw new (typeof options.method === 'string' ? Error : TypeError)(`Invalid \`method\` option: ${
+						formattedMethod
+					}. \`dl-tar\` module is designed to download archive files. So it only supports the default request method "GET" and it cannot be overridden by \`method\` option.`);
+				}
 			}
 
-			if (!isFinite(options.strip)) {
-				throw new RangeError(`${STRIP_ERROR}, but got ${options.strip}.`);
+			for (const optionName of functionOptions) {
+				const val = options[optionName];
+
+				if (val !== undefined && typeof val !== 'function') {
+					throw new TypeError(`\`${optionName}\` option must be a function, but got ${
+						inspectWithKind(val)
+					}.`);
+				}
 			}
 
-			if (options.strip > Number.MAX_SAFE_INTEGER) {
-				throw new RangeError(`${STRIP_ERROR}, but got a too large number.`);
+			if (options.strip !== undefined) {
+				if (typeof options.strip !== 'number') {
+					throw new TypeError(`${STRIP_ERROR}, but got a non-number value ${inspect(options.strip)}.`);
+				}
+
+				if (!isFinite(options.strip)) {
+					throw new RangeError(`${STRIP_ERROR}, but got ${options.strip}.`);
+				}
+
+				if (options.strip > Number.MAX_SAFE_INTEGER) {
+					throw new RangeError(`${STRIP_ERROR}, but got a too large number.`);
+				}
+
+				if (options.strip < 0) {
+					throw new RangeError(`${STRIP_ERROR}, but got a negative number ${options.strip}.`);
+				}
+
+				if (!Number.isInteger(options.strip)) {
+					throw new Error(`${STRIP_ERROR}, but got a non-integer number ${options.strip}.`);
+				}
 			}
 
-			if (options.strip < 0) {
-				throw new RangeError(`${STRIP_ERROR}, but got a negative number ${options.strip}.`);
-			}
+			if (options.tarTransform !== undefined) {
+				if (!isStream(options.tarTransform)) {
+					throw new TypeError(`${TAR_TRANSFORM_ERROR}, but got a non-stream value ${inspect(options.tarTransform)}.`);
+				}
 
-			if (!Number.isInteger(options.strip)) {
-				throw new Error(`${STRIP_ERROR}, but got a non-integer number ${options.strip}.`);
-			}
-		}
-
-		if (options.tarTransform !== undefined) {
-			if (!isStream(options.tarTransform)) {
-				throw new TypeError(`${TAR_TRANSFORM_ERROR}, but got a non-stream value ${inspect(options.tarTransform)}.`);
-			}
-
-			if (!isStream.transform(options.tarTransform)) {
-				throw new TypeError(`${TAR_TRANSFORM_ERROR}, but got a ${
-					['duplex', 'writable', 'readable'].find(type => isStream[type](options.tarTransform))
-				} stream instead.`);
+				if (!isStream.transform(options.tarTransform)) {
+					throw new TypeError(`${TAR_TRANSFORM_ERROR}, but got a ${
+						['duplex', 'writable', 'readable'].find(type => isStream[type](options.tarTransform))
+					} stream instead.`);
+				}
 			}
 		}
 
