@@ -7,7 +7,7 @@ const {Transform} = require('stream');
 
 const clearAllModules = require('clear-module').all;
 const {pack} = require('tar-stream');
-const noop = require('nop');
+const noop = require('lodash/fp/noop');
 const pathExists = require('path-exists');
 const readUtf8File = require('read-utf8-file');
 const rmfr = require('rmfr');
