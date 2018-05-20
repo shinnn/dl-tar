@@ -1,14 +1,13 @@
 'use strict';
 
 const {createServer} = require('http');
-const {createGunzip, createGzip} = require('zlib');
-const {normalize} = require('path');
-const {Transform} = require('stream');
+const {createGzip} = require('zlib');
 
 const clearAllModules = require('clear-module').all;
 const {pack} = require('tar-stream');
 const noop = require('lodash/fp/noop');
 const pathExists = require('path-exists');
+const pRetry = require('p-retry');
 const readUtf8File = require('read-utf8-file');
 const rmfr = require('rmfr');
 const test = require('tape');
@@ -23,7 +22,7 @@ test('dlTar() with broken PATH', t => {
 
 	const dlTar = require('.');
 
-	dlTar('http://localhost:3018', '__').subscribe({
+	dlTar('http://localhost:3018', process.cwd()).subscribe({
 		error({code}) {
 			t.ok(code, 'should fail to load `request` module.');
 
@@ -49,7 +48,7 @@ const server = createServer((req, res) => {
 		return;
 	}
 
-	if (req.url === '/eisdir') {
+	if (req.url === '/enotempty') {
 		tar.entry({name: 'dir', type: 'directory'});
 		tar.entry({name: 'dir/node_modules'}, 'Hi');
 		tar.finalize();
@@ -82,14 +81,14 @@ const server = createServer((req, res) => {
 
 		dlTar('http://localhost:3018/', 'tmp/a').subscribe({
 			next(progress) {
-				if (progress.entry.header.name === '') {
+				if (progress.entry.path === '') {
 					t.equal(
 						progress.entry.header.type,
-						'directory',
+						'Directory',
 						'should send progress when a directory is created.'
 					);
 					t.equal(
-						progress.entry.bytes,
+						progress.entry.size,
 						0,
 						'should consider the size of directory as 0.'
 					);
@@ -97,19 +96,19 @@ const server = createServer((req, res) => {
 					return;
 				}
 
-				if (progress.entry.header.name === '1.txt') {
-					if (progress.entry.bytes === 0) {
+				if (progress.entry.path === '1.txt') {
+					if (progress.entry.remain === 2) {
 						t.pass('should notify the beginning of extraction to the observer.');
-					} else if (progress.entry.bytes === 2) {
+					} else if (progress.entry.remain === 0) {
 						t.pass('should notify the ending of extraction to the observer.');
 					}
 
 					return;
 				}
 
-				if (progress.entry.header.name === 'empty.txt') {
+				if (progress.entry.path === 'empty.txt') {
 					t.equal(
-						progress.entry.bytes,
+						progress.entry.remain,
 						0,
 						'should send extraction progress even if the file is 0 byte.'
 					);
@@ -117,10 +116,10 @@ const server = createServer((req, res) => {
 					return;
 				}
 
-				if (progress.entry.bytes === 0) {
+				if (progress.entry.remain === 0) {
 					t.equal(
-						progress.entry.header.name,
-						'nested/2.txt',
+						progress.entry.header.path,
+						'dir/nested/2.txt',
 						'should send entry headers to the observer.'
 					);
 
@@ -161,47 +160,32 @@ const server = createServer((req, res) => {
 
 		dlTar('http://localhost:3018/', 'tmp/b', {
 			strip: 0,
-			map(header) {
-				header.name = `prefix-${header.name}`;
-				return header;
-			},
-			mapStream(stream, header) {
-				return stream.pipe(new Transform({
-					transform(data, enc, cb) {
-						cb(null, `${data.length / header.size * 100} %`);
-					}
-				}));
-			},
-			ignore(file) {
-				return file === normalize('tmp/b/dir/1.txt');
+			filter(file) {
+				return file !== 'dir/1.txt';
 			}
 		}).subscribe({
 			error: t.fail,
 			async complete() {
-				const [content, ignoredFileExists] = await Promise.all([
-					readUtf8File('tmp/b/prefix-dir/nested/2.txt'),
-					pathExists('tmp/b/prefix-dir/1.txt')
+				const [fileExists, ignoredFileExists] = await Promise.all([
+					pathExists('tmp/b/dir/nested/2.txt'),
+					pathExists('tmp/b/dir/1.txt')
 				]);
 
-				t.equal(content, '100 %', 'should support tar-fs options.');
+				t.ok(fileExists, 'should extract files passed `filter` function.');
 				t.notOk(ignoredFileExists, 'should leave ignored files unextracted.');
 			}
 		});
 
 		const fail = t.fail.bind(t, 'Unexpectedly succeeded.');
 
-		const subscription = dlTar('/huge', 'tmp/c', {
-			baseUrl: 'http://localhost:3018',
-			tarTransform: createGunzip()
-		}).subscribe({
+		const subscription = dlTar('/huge', 'tmp/c', {baseUrl: 'http://localhost:3018'}).subscribe({
 			async next() {
 				subscription.unsubscribe();
 
-				const content = await readUtf8File('tmp/c/huge.txt');
-				t.equal(content.slice(0, 3), '...', 'should support `tarTransform` option.');
-				t.notEqual(
-					content.length,
-					largeBuf.length,
+				const content = await pRetry(() => readUtf8File('tmp/c/huge.txt'));
+				t.equal(content.slice(0, 3), '...', 'should gunzip response if needed.');
+				t.ok(
+					content.length < largeBuf.length,
 					'should stop extraction when the subscription is unsubscribed.'
 				);
 
@@ -214,7 +198,7 @@ const server = createServer((req, res) => {
 			complete: fail
 		});
 
-		dlTar('http://localhost:3018', __filename).subscribe({
+		dlTar('http://localhost:3018', process.cwd()).subscribe({
 			start(subscriptionItself) {
 				process.nextTick(() => {
 					t.ok(subscriptionItself.closed, 'should be immediately unsubscribable.');
@@ -229,23 +213,23 @@ const server = createServer((req, res) => {
 			error: ({code}) => t.equal(code, 'EEXIST', 'should fail when it cannot create directories.')
 		});
 
-		dlTar('http://localhost:3018/eisdir', __dirname).subscribe({
+		dlTar('http://localhost:3018/enotempty', __dirname).subscribe({
 			error({code}) {
-				t.equal(code, 'EISDIR', 'should fail when it cannot write files.');
+				t.equal(code, 'ENOTEMPTY', 'should fail when it cannot write files.');
 			},
 			complete: fail
 		});
 
-		dlTar('http://localhost:3018/non-tar', '__').subscribe({
+		dlTar('http://localhost:3018/non-tar', process.cwd()).subscribe({
 			complete: fail,
 			error: err => t.equal(
 				err.toString(),
-				'Error: Invalid tar header. Maybe the tar is corrupted or it needs to be gunzipped?',
+				'Error: invalid entry',
 				'should fail when the downloaded content is not a tar archive.'
 			)
 		});
 
-		dlTar('https://example.org/4/0/4/n/o/t/f/o/u/n/d', '__', {method: 'GET'}).subscribe({
+		dlTar('https://example.org/4/0/4/n/o/t/f/o/u/n/d', process.cwd(), {method: 'GET'}).subscribe({
 			complete: fail,
 			error: err => t.equal(
 				err.toString(),
@@ -323,49 +307,21 @@ const server = createServer((req, res) => {
 		);
 
 		t.equal(
-			await getError('http://localhost:3018/', '__', {tarTransform: 0}),
-			'TypeError: `tarTransform` option must be a transform stream that modifies ' +
-      'the downloaded tar archive before extracting, but got a non-stream value 0.',
-			'should fail when `tarTransform` option is not an object.'
+			await getError('http://localhost:3018/', '__', {filter: new Set()}),
+			'TypeError: `filter` option must be a function, but got Set {}.',
+			'should fail when `filter` option is not a function.'
 		);
 
 		t.equal(
-			await getError('http://localhost:3018/', '__', {tarTransform: process.stdin}),
-			'TypeError: `tarTransform` option must be a transform stream that modifies ' +
-      'the downloaded tar archive before extracting, but got a readable stream instead.',
-			'should fail when `tarTransform` option is a non-transform stream.'
+			await getError('http://localhost:3018/', '__', {onwarn: new Uint16Array()}),
+			'TypeError: `onwarn` option must be a function, but got Uint16Array [  ].',
+			'should fail when `onwarn` option is not a function.'
 		);
 
 		t.equal(
-			await getError('http://localhost:3018/', '__', {ignore: /^/}),
-			'TypeError: `ignore` option must be a function, but got /^/ (regexp).',
-			'should fail when `ignore` option is not a function.'
-		);
-
-		t.equal(
-			await getError('http://localhost:3018/', '__', {map: new WeakSet()}),
-			'TypeError: `map` option must be a function, but got WeakSet {}.',
-			'should fail when `map` option is not a function.'
-		);
-
-		t.equal(
-			await getError('http://localhost:3018/', '__', {mapStream: new Uint8Array()}),
-			'TypeError: `mapStream` option must be a function, but got Uint8Array [  ].',
-			'should fail when `mapTransform` option is not a function.'
-		);
-
-		t.equal(
-			await getError('http://localhost:3018', 'tmp/d', {mapStream: () => new Uint16Array()}),
-			'TypeError: The function passed to `mapStream` option must return a stream,' +
-      ' but returned a non-stream value Uint16Array [  ].',
-			'should fail when `mapTransform` option returns a non-stream value.'
-		);
-
-		t.equal(
-			await getError('http://localhost:3018', 'tmp/e', {mapStream: () => process.stdout}),
-			'TypeError: The function passed to `mapStream` option must return a stream' +
-      ' that is readable, but returned a non-readable stream.',
-			'should fail when `mapTransform` option returns a non-readable stream.'
+			await getError('http://localhost:3018/', '__', {transform: new Uint32Array()}),
+			'TypeError: `transform` option must be a function, but got Uint32Array [  ].',
+			'should fail when `transform` option is not a function.'
 		);
 
 		t.equal(
@@ -408,6 +364,12 @@ const server = createServer((req, res) => {
 			'Error: Expected `strip` option to be a non-negative integer (0, 1, ...) that specifies ' +
       'how many leading components from file names will be stripped, but got a non-integer number 1.999.',
 			'should fail when `strip` option is a non-integer number.'
+		);
+
+		t.equal(
+			await getError('http://localhost:3018/', '__', {onentry: noop}),
+			'Error: `dl-tar` does not support `onentry` option.',
+			'should fail when `onentry` option is provided.'
 		);
 
 		t.end();

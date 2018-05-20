@@ -22,11 +22,9 @@ const url = 'https://****.org/my-archive.tar';
 
 dlTar(url, 'my/dir').subscribe({
   next({entry}) {
-    if (entry.bytes !== entry.header.size) {
-      return;
+    if (entry.remain === 0) {
+      console.log(`✓ ${entry.header.name}`);
     }
-
-    console.log(`✓ ${entry.header.name}`);
   },
   complete() {
     readdirSync('my/dir'); //=> ['INSTALL', LICENSE', 'README.md', 'bin']
@@ -46,11 +44,9 @@ dlTar(url, 'my/dir').subscribe({
 Completed.
 ```
 
-For [gzipped](https://tools.ietf.org/html/rfc1952) tar (`tar.gz`), use [`dl-tgz`](https://github.com/shinnn/dl-tgz) instead.
-
 ## Installation
 
-[Use npm.](https://docs.npmjs.com/cli/install)
+[Use](https://docs.npmjs.com/cli/install) [npm](https://docs.npmjs.com/getting-started/what-is-npm).
 
 ```
 npm install dl-tar
@@ -64,8 +60,8 @@ const dlTar = require('dl-tar');
 
 ### dlTar(*tarArchiveUrl*, *extractDir* [, *options*])
 
-*tarArchiveUrl*: `String`  
-*extractDir*: `String` (a path where the archive will be extracted)  
+*tarArchiveUrl*: `string`  
+*extractDir*: `string` (a path where the archive will be extracted)  
 *options*: `Object`  
 Return: [`Observable`](https://tc39.github.io/proposal-observable/#observable) ([zenparsing's implementation](https://github.com/zenparsing/zen-observable))
 
@@ -73,26 +69,28 @@ When the `Observable` is [subscribe](https://tc39.github.io/proposal-observable/
 
 When the [`Subscription`](https://tc39.github.io/proposal-observable/#subscription-objects) is [unsubscribe](https://tc39.github.io/proposal-observable/#subscription-prototype-unsubscribe)d, it stops downloading and extracting.
 
+It automatically unzips gzipped archives.
+
 #### Progress
 
 Every progress object have two properties `entry` and `response`.
 
 ##### entry
 
-Type: `Object {bytes: <number>, header: <Object>}`
+Type: [`tar.ReadEntry`](https://github.com/npm/node-tar#class-tarreadentry-extends-minipass)
 
-`entry.header` is [a header of the entry](https://github.com/mafintosh/tar-stream#headers), and `entry.bytes` is the total size of currently extracted entry. `bytes` is always `0` if the entry is not a file but directory, link or symlink.
+An instance of [node-tar](https://github.com/npm/node-tar)'s [`ReadEntry`](https://github.com/npm/node-tar/blob/v4.4.2/lib/read-entry.js) object.
 
-For example you can get the progress of each entry as a percentage by `(progress.entry.bytes / progress.entry.header.size || 0) * 100`.
+For example you can get the progress of each entry as a percentage by `100 - progress.entry.remain / progress.entry.size * 100`.
 
 ```javascript
 dlTar('https://****.org/my-archive.tar', 'my/dir')
-.filter(progress => progress.entry.header.type === 'file')
+.filter(progress => progress.entry.type === 'File')
 .subscribe(progress => {
-  console.log(`${(progress.entry.bytes / progress.entry.header.size * 100).toFixed(1)} %`);
+  console.log(`${(100 - progress.entry.remain / progress.entry.size * 100).toFixed(1)} %`);
 
-  if (progress.entry.bytes === progress.entry.header.size) {
-    console.log(`>> OK ${progress.entry.header.name}`);
+  if (progress.entry.remain === 0) {
+    console.log(`>> OK ${progress.entry.header.path}`);
   }
 });
 ```
@@ -119,34 +117,15 @@ dlTar('https://****.org/my-archive.tar', 'my/dir')
 
 Type: `Object {bytes: <number>, headers: <Object>, url: <string>}`
 
-`response.url` is the final redirected URL of the request, `response.headers` is a [response header object](https://nodejs.org/api/http.html#http_message_headers) derived from [`http.IncomingMessage`](https://nodejs.org/api/http.html#http_class_http_incomingmessage), and `response.bytes` is a total content length of the downloaded archive. `content-length` header will be converted to `Number` if it is `String`.
+`response.url` is the final redirected URL of the request, `response.headers` is a [response header object](https://nodejs.org/api/http.html#http_message_headers) derived from [`http.IncomingMessage`](https://nodejs.org/api/http.html#http_class_http_incomingmessage), and `response.bytes` is a total content length of the downloaded archive. `content-length` header will be converted to `number` if it's `string`.
 
 #### Options
 
-You can pass options to [Request](https://github.com/request/request#requestoptions-callback) and [tar-fs](https://github.com/mafintosh/tar-fs)'s [`extract` method](https://github.com/mafintosh/tar-fs/blob/12968d9f650b07b418d348897cd922e2b27ec18c/index.js#L167). Note that:
+You can pass options to [Request](https://github.com/request/request#requestoptions-callback) and [node-tar](https://www.npmjs.com/package/tar)'s [`Unpack` constructor](https://github.com/npm/node-tar#class-tarunpack). Note that:
 
-* [`ignore` option](https://github.com/mafintosh/tar-fs/blob/b79d82a79c5e21f6187462d7daaba1fc03cdd1de/index.js#L236) is applied before [`map` option](https://github.com/mafintosh/tar-fs/blob/b79d82a79c5e21f6187462d7daaba1fc03cdd1de/index.js#L232) modifies filenames.
-* [`strip` option](https://github.com/mafintosh/tar-fs/blob/12968d9f650b07b418d348897cd922e2b27ec18c/index.js#L47) defaults to `1`, not `0`. That means the top level directory is stripped off by default.
-* [`fs`](https://github.com/mafintosh/tar-fs/blob/e59deed830fded0e4e5beb016d2df9c7054bb544/index.js#L65) option defaults to [graceful-fs](https://github.com/isaacs/node-graceful-fs) for more stability.
-
-Additionally, you can use the following:
-
-##### tarTransform
-
-Type: [`Stream`](https://nodejs.org/api/stream.html#stream_stream)
-
-A [transform stream](https://nodejs.org/api/stream.html#stream_class_stream_transform) to modify the archive before extraction.
-
-For example, pass [gunzip-maybe](https://github.com/mafintosh/gunzip-maybe) to this option and you can download both [gzipped](https://tools.ietf.org/html/rfc1952) and non-gzipped tar.
-
-```javascript
-const dlTar = require('dl-tar');
-const gunzipMaybe = require('gunzip-maybe');
-
-const observable = dlTar('https://github.com/nodejs/node/archive/master.tar.gz', './', {
-  tarTransform: gunzipMaybe()
-});
-```
+* `onentry` option is not supported.
+* `strict` option defaults to `true`, not `false`.
+* `strip` option defaults to `1`, not `0`. That means the top level directory is stripped off by default.
 
 ## License
 

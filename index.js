@@ -1,88 +1,83 @@
 'use strict';
 
 const {inspect} = require('util');
-const {join} = require('path');
-const streamLib = require('stream');
-
-const Transform = streamLib.Transform;
-const PassThrough = streamLib.PassThrough;
+const {Transform} = require('stream');
 
 const cancelablePump = require('cancelable-pump');
-const Extract = require('tar-stream').extract;
-const fsExtract = require('tar-fs').extract;
-const gracefulFs = require('graceful-fs');
+const {Unpack} = require('tar');
 const inspectWithKind = require('inspect-with-kind');
 const isPlainObj = require('is-plain-obj');
-const isStream = require('is-stream');
 const loadRequestFromCwdOrNpm = require('load-request-from-cwd-or-npm');
+const mkdirp = require('mkdirp');
 const Observable = require('zen-observable');
 
-class DestroyableTransform extends Transform {
-	destroy() {
-		super.unpipe();
-	}
-}
-
-class InternalExtract extends Extract {
+class InternalUnpack extends Unpack {
 	constructor(options) {
-		super();
+		super(Object.assign({strict: true, strip: 1}, options, {
+			onentry(entry) {
+				if (entry.size === 0) {
+					setImmediate(() => this.emitProgress(entry));
+					return;
+				}
 
-		this.cwd = options.cwd;
-		this.ignore = options.ignore;
+				if (entry.remain === 0) {
+					setImmediate(() => {
+						this.emitFirstProgress(entry);
+						this.emitProgress(entry);
+					});
+					return;
+				}
+
+				const originalWrite = entry.write.bind(entry);
+				let firstValueEmitted = false;
+
+				entry.write = data => {
+					const originalReturn = originalWrite(data);
+
+					if (!firstValueEmitted) {
+						firstValueEmitted = true;
+						this.emitFirstProgress(entry);
+					}
+
+					this.emitProgress(entry);
+					return originalReturn;
+				};
+			}
+		}));
+
 		this.observer = options.observer;
 		this.url = '';
 		this.responseHeaders = null;
 		this.responseBytes = 0;
 	}
 
-	emit(eventName, header, stream, originalNext) {
-		if (eventName !== 'entry') {
-			super.emit(eventName, header);
-			return;
-		}
-
-		if (this.ignore && this.ignore(join(this.cwd, join('/', header.name)), header)) {
-			stream.resume();
-			originalNext();
-
-			return;
-		}
-
-		super.emit('entry', header, stream, err => {
-			if (err) {
-				originalNext(err);
-				return;
+	emitProgress(entry) {
+		this.observer.next({
+			entry,
+			response: {
+				url: this.url,
+				headers: this.responseHeaders,
+				bytes: this.responseBytes
 			}
-
-			this.observer.next({
-				entry: {
-					header,
-					bytes: header.size
-				},
-				response: {
-					url: this.url,
-					headers: this.responseHeaders,
-					bytes: this.responseBytes
-				}
-			});
-
-			originalNext();
 		});
+	}
+
+	emitFirstProgress(entry) {
+		const originalRemain = entry.remain;
+		const originalBlockRemain = entry.blockRemain;
+
+		entry.remain = entry.size;
+		entry.blockRemain = entry.startBlockSize;
+		this.emitProgress(entry);
+		entry.remain = originalRemain;
+		entry.blockRemain = originalBlockRemain;
 	}
 }
 
-const functionOptions = new Set(['ignore', 'map', 'mapStream']);
+const functionOptions = new Set(['filter', 'onwarn', 'transform']);
 const priorRequestOption = {encoding: null};
-const priorTarFsOption = {ignore: null};
-
-function echo(val) {
-	return val;
-}
 
 const DEST_ERROR = 'Expected a path where downloaded tar archive will be extracted';
-const TAR_TRANSFORM_ERROR = '`tarTransform` option must be a transform stream ' +
-                            'that modifies the downloaded tar archive before extracting';
-const MAP_STREAM_ERROR = 'The function passed to `mapStream` option must return a stream';
 const STRIP_ERROR = 'Expected `strip` option to be a non-negative integer (0, 1, ...) ' +
                     'that specifies how many leading components from file names will be stripped';
 
@@ -163,90 +158,35 @@ module.exports = function dlTar(...args) {
 				}
 			}
 
-			if (options.tarTransform !== undefined) {
-				if (!isStream(options.tarTransform)) {
-					throw new TypeError(`${TAR_TRANSFORM_ERROR}, but got a non-stream value ${inspect(options.tarTransform)}.`);
-				}
-
-				if (!isStream.transform(options.tarTransform)) {
-					throw new TypeError(`${TAR_TRANSFORM_ERROR}, but got a ${
-						['duplex', 'writable', 'readable'].find(type => isStream[type](options.tarTransform))
-					} stream instead.`);
-				}
+			if (options.onentry !== undefined) {
+				throw new Error('`dl-tar` does not support `onentry` option.');
 			}
 		}
 
-		const extractStream = new InternalExtract({
-			cwd: dest,
-			ignore: options.ignore,
-			observer
-		});
-		const mapStream = options.mapStream || echo;
-		const fileStreams = [];
 		let ended = false;
 		let cancel;
 
-		const fsExtractStream = fsExtract(dest, Object.assign({
-			extract: extractStream,
-			fs: gracefulFs,
-			strip: 1
-		}, options, {
-			mapStream(fileStream, header) {
-				const newStream = mapStream(fileStream, header);
-
-				if (!isStream.readable(newStream)) {
-					fsExtractStream.emit(
-						'error',
-						new TypeError(`${MAP_STREAM_ERROR}${
-							isStream(newStream) ?
-								' that is readable, but returned a non-readable stream' :
-								`, but returned a non-stream value ${inspect(newStream)}`
-						}.`)
-					);
-
-					fileStreams.push(fileStream);
-					return new PassThrough();
-				}
-
-				let bytes = 0;
-				fileStreams.push(newStream);
-
-				if (header.size !== 0) {
-					observer.next({
-						entry: {header, bytes},
-						response: {
-							url: extractStream.url,
-							headers: extractStream.responseHeaders,
-							bytes: extractStream.responseBytes
-						}
-					});
-				}
-
-				return newStream.pipe(new DestroyableTransform({
-					transform(chunk, encoding, cb) {
-						bytes += chunk.length;
-
-						if (bytes !== header.size) {
-							observer.next({
-								entry: {header, bytes},
-								response: {
-									url: extractStream.url,
-									headers: extractStream.responseHeaders,
-									bytes: extractStream.responseBytes
-								}
-							});
-						}
-
-						cb(null, chunk);
+		Promise.all([
+			loadRequestFromCwdOrNpm(),
+			new Promise((resolve, reject) => {
+				mkdirp(dest, err => {
+					if (err) {
+						reject(err);
+						return;
 					}
-				}));
-			}
-		}, priorTarFsOption));
 
-		loadRequestFromCwdOrNpm().then(request => {
+					resolve();
+				});
+			})
+		]).then(([request]) => {
 			if (ended) {
 				return;
 			}
+
+			const unpackStream = new InternalUnpack(Object.assign(options, {
+				cwd: dest,
+				observer
+			}));
 
 			const pipe = [
 				request(Object.assign({url}, options, priorRequestOption))
@@ -260,21 +200,17 @@ module.exports = function dlTar(...args) {
 						response.headers['content-length'] = Number(response.headers['content-length']);
 					}
 
-					extractStream.url = response.request.uri.href;
-					extractStream.responseHeaders = response.headers;
+					unpackStream.url = response.request.uri.href;
+					unpackStream.responseHeaders = response.headers;
 				}),
 				new Transform({
 					transform(chunk, encoding, cb) {
-						extractStream.responseBytes += chunk.length;
+						unpackStream.responseBytes += chunk.length;
 						cb(null, chunk);
 					}
 				}),
-				fsExtractStream
+				unpackStream
 			];
-
-			if (options.tarTransform) {
-				pipe.splice(2, 0, options.tarTransform);
-			}
 
 			cancel = cancelablePump(pipe, err => {
 				ended = true;
