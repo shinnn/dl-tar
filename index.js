@@ -166,66 +166,70 @@ module.exports = function dlTar(...args) {
 		let ended = false;
 		let cancel;
 
-		Promise.all([
-			loadRequestFromCwdOrNpm(),
-			new Promise((resolve, reject) => {
-				mkdirp(dest, err => {
-					if (err) {
-						reject(err);
-						return;
-					}
+		(async () => {
+			try {
+				const [request] = await Promise.all([
+					loadRequestFromCwdOrNpm(),
+					new Promise((resolve, reject) => {
+						mkdirp(dest, err => {
+							if (err) {
+								reject(err);
+								return;
+							}
 
-					resolve();
-				});
-			})
-		]).then(([request]) => {
-			if (ended) {
-				return;
-			}
+							resolve();
+						});
+					})
+				]);
 
-			const unpackStream = new InternalUnpack(Object.assign(options, {
-				cwd: dest,
-				observer
-			}));
-
-			const pipe = [
-				request(Object.assign({url}, options, priorRequestOption))
-				.on('response', function(response) {
-					if (response.statusCode < 200 || 299 < response.statusCode) {
-						this.emit('error', new Error(`${response.statusCode} ${response.statusMessage}`));
-						return;
-					}
-
-					if (typeof response.headers['content-length'] === 'string') {
-						response.headers['content-length'] = Number(response.headers['content-length']);
-					}
-
-					unpackStream.url = response.request.uri.href;
-					unpackStream.responseHeaders = response.headers;
-				}),
-				new Transform({
-					transform(chunk, encoding, cb) {
-						unpackStream.responseBytes += chunk.length;
-						cb(null, chunk);
-					}
-				}),
-				unpackStream
-			];
-
-			cancel = cancelablePump(pipe, err => {
-				ended = true;
-
-				if (err) {
-					observer.error(err);
+				if (ended) {
 					return;
 				}
 
-				observer.complete();
-			});
-		}).catch(err => {
-			ended = true;
-			observer.error(err);
-		});
+				const unpackStream = new InternalUnpack(Object.assign(options, {
+					cwd: dest,
+					observer
+				}));
+
+				const pipe = [
+					request(Object.assign({url}, options, priorRequestOption))
+					.on('response', function(response) {
+						if (response.statusCode < 200 || 299 < response.statusCode) {
+							this.emit('error', new Error(`${response.statusCode} ${response.statusMessage}`));
+							return;
+						}
+
+						if (typeof response.headers['content-length'] === 'string') {
+							response.headers['content-length'] = Number(response.headers['content-length']);
+						}
+
+						unpackStream.url = response.request.uri.href;
+						unpackStream.responseHeaders = response.headers;
+					}),
+					new Transform({
+						transform(chunk, encoding, cb) {
+							unpackStream.responseBytes += chunk.length;
+							cb(null, chunk);
+						}
+					}),
+					unpackStream
+				];
+
+				cancel = cancelablePump(pipe, err => {
+					ended = true;
+
+					if (err) {
+						observer.error(err);
+						return;
+					}
+
+					observer.complete();
+				});
+			} catch (err) {
+				ended = true;
+				observer.error(err);
+			}
+		})();
 
 		return function cancelExtract() {
 			if (!cancel) {
