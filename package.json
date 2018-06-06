@@ -1,6 +1,6 @@
 {
 	"name": "dl-tar",
-	"version": "0.7.0",
+	"version": "0.7.0-0",
 	"description": "Download and extract a tar archive with the Observable API",
 	"repository": "shinnn/dl-tar",
 	"author": "Shinnosuke Watanabe (https://github.com/shinnn)",
@@ -34,7 +34,7 @@
 		"is-plain-obj": "^1.1.0",
 		"load-request-from-cwd-or-npm": "^2.0.1",
 		"mkdirp": "^0.5.1",
-		"tar": "^4.4.2",
+		"tar": "^4.4.4",
 		"zen-observable": "^0.6.1"
 	},
 	"devDependencies": {
@@ -42,7 +42,7 @@
 		"clear-module": "^2.1.0",
 		"eslint": "^4.19.1",
 		"lodash": "^4.17.10",
-		"nyc": "^11.8.0",
+		"nyc": "^12.0.2",
 		"p-retry": "^2.0.0",
 		"path-exists": "^3.0.0",
 		"read-utf8-file": "^2.0.0",
