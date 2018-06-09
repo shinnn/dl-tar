@@ -1,6 +1,6 @@
 'use strict';
 
-const {inspect} = require('util');
+const {inspect, promisify} = require('util');
 const {Transform} = require('stream');
 
 const cancelablePump = require('cancelable-pump');
@@ -10,6 +10,8 @@ const isPlainObj = require('is-plain-obj');
 const loadRequestFromCwdOrNpm = require('load-request-from-cwd-or-npm');
 const mkdirp = require('mkdirp');
 const Observable = require('zen-observable');
+
+const promisifiedMkdirp = promisify(mkdirp);
 
 class InternalUnpack extends Unpack {
 	constructor(options) {
@@ -170,16 +172,7 @@ module.exports = function dlTar(...args) {
 			try {
 				const [request] = await Promise.all([
 					loadRequestFromCwdOrNpm(),
-					new Promise((resolve, reject) => {
-						mkdirp(dest, err => {
-							if (err) {
-								reject(err);
-								return;
-							}
-
-							resolve();
-						});
-					})
+					promisifiedMkdirp(dest)
 				]);
 
 				if (ended) {
