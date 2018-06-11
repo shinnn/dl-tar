@@ -15,7 +15,10 @@ const promisifiedMkdirp = promisify(mkdirp);
 
 class InternalUnpack extends Unpack {
 	constructor(options) {
-		super(Object.assign({strict: true, strip: 1}, options, {
+		super({
+			strict: true,
+			strip: 1,
+			...options,
 			onentry(entry) {
 				if (entry.size === 0) {
 					setImmediate(() => this.emitProgress(entry));
@@ -45,7 +48,7 @@ class InternalUnpack extends Unpack {
 					return originalReturn;
 				};
 			}
-		}));
+		});
 
 		this.observer = options.observer;
 		this.url = '';
@@ -77,7 +80,6 @@ class InternalUnpack extends Unpack {
 }
 
 const functionOptions = new Set(['filter', 'onwarn', 'transform']);
-const priorRequestOption = {encoding: null};
 
 const DEST_ERROR = 'Expected a path where downloaded tar archive will be extracted';
 const STRIP_ERROR = 'Expected `strip` option to be a non-negative integer (0, 1, ...) ' +
@@ -179,13 +181,14 @@ module.exports = function dlTar(...args) {
 					return;
 				}
 
-				const unpackStream = new InternalUnpack(Object.assign(options, {
+				const unpackStream = new InternalUnpack({
+					...options,
 					cwd: dest,
 					observer
-				}));
+				});
 
 				const pipe = [
-					request(Object.assign({url}, options, priorRequestOption))
+					request({url, ...options, encoding: null})
 					.on('response', function(response) {
 						if (response.statusCode < 200 || 299 < response.statusCode) {
 							this.emit('error', new Error(`${response.statusCode} ${response.statusMessage}`));
