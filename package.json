@@ -5,8 +5,8 @@
 	"repository": "shinnn/dl-tar",
 	"author": "Shinnosuke Watanabe (https://github.com/shinnn)",
 	"scripts": {
-		"pretest": "eslint --fix --format=codeframe index.js test.js",
-		"test": "nyc --reporter=html --reporter=text node test.js"
+		"pretest": "eslint .",
+		"test": "nyc node test.js"
 	},
 	"license": "ISC",
 	"files": [
@@ -30,27 +30,32 @@
 	],
 	"dependencies": {
 		"cancelable-pump": "^0.4.0",
-		"inspect-with-kind": "^1.0.4",
+		"inspect-with-kind": "^1.0.5",
 		"is-plain-obj": "^1.1.0",
-		"load-request-from-cwd-or-npm": "^2.0.1",
+		"load-request-from-cwd-or-npm": "^3.0.0",
 		"mkdirp": "^0.5.1",
-		"tar": "^4.4.4",
+		"tar": "^4.4.6",
 		"zen-observable": "^0.6.1"
 	},
 	"devDependencies": {
-		"@shinnn/eslint-config-node": "^5.0.0",
-		"clear-module": "^2.1.0",
-		"eslint": "^4.19.1",
-		"lodash": "^4.17.10",
-		"nyc": "^12.0.2",
+		"@shinnn/eslint-config": "^6.7.1",
+		"broken-npm-path": "^1.0.0",
+		"clear-module": "^3.0.0",
+		"eslint": "^5.6.0",
+		"lodash": "^4.17.11",
+		"nyc": "^13.0.1",
+		"nyc-config-common": "^1.0.0",
 		"p-retry": "^2.0.0",
 		"path-exists": "^3.0.0",
 		"read-utf8-file": "^2.0.0",
 		"rmfr": "^2.0.0",
 		"tape": "^4.9.1",
-		"tar-stream": "^1.6.1"
+		"tar-stream": "^1.6.2"
 	},
 	"eslintConfig": {
-		"extends": "@shinnn/node"
+		"extends": "@shinnn"
+	},
+	"nyc": {
+		"extends": "nyc-config-common"
 	}
 }

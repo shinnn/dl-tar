@@ -3,9 +3,10 @@
 const {createServer} = require('http');
 const {createGzip} = require('zlib');
 
+const brokenNpmPath = require('broken-npm-path');
 const clearAllModules = require('clear-module').all;
-const {pack} = require('tar-stream');
 const noop = require('lodash/fp/noop');
+const {pack} = require('tar-stream');
 const pathExists = require('path-exists');
 const pRetry = require('p-retry');
 const readUtf8File = require('read-utf8-file');
@@ -18,15 +19,19 @@ test('dlTar() with broken PATH', t => {
 	t.plan(1);
 
 	const originalPath = process.env.PATH;
+	const originalNpmExecPath = process.env.npm_execpath;
 	process.env.PATH = '/n/p/m/_/d/o/e/s/_/n/o/t/_/e/x/i/s/t/_/h/e/r/e';
+	process.env.npm_execpath = brokenNpmPath; // eslint-disable-line camelcase
 
 	const dlTar = require('.');
 
-	dlTar('http://localhost:3018', process.cwd()).subscribe({
+	dlTar('http://localhost:3018', __dirname).subscribe({
+		complete: t.fail.bind(t, 'Unexpectedly completed.'),
 		error({code}) {
 			t.ok(code, 'should fail to load `request` module.');
 
 			process.env.PATH = originalPath;
+			process.env.npm_execpath = originalNpmExecPath; // eslint-disable-line camelcase
 		}
 	});
 });
@@ -220,7 +225,7 @@ const server = createServer((req, res) => {
 			complete: fail
 		});
 
-		dlTar('http://localhost:3018/non-tar', process.cwd()).subscribe({
+		dlTar('http://localhost:3018/non-tar', __dirname).subscribe({
 			complete: fail,
 			error: err => t.equal(
 				err.toString(),
@@ -229,7 +234,7 @@ const server = createServer((req, res) => {
 			)
 		});
 
-		dlTar('https://example.org/4/0/4/n/o/t/f/o/u/n/d', process.cwd(), {method: 'GET'}).subscribe({
+		dlTar('https://example.org/4/0/4/n/o/t/f/o/u/n/d', __dirname, {method: 'GET'}).subscribe({
 			complete: fail,
 			error: err => t.equal(
 				err.toString(),
@@ -314,13 +319,13 @@ const server = createServer((req, res) => {
 
 		t.equal(
 			await getError('http://localhost:3018/', '__', {onwarn: new Uint16Array()}),
-			'TypeError: `onwarn` option must be a function, but got Uint16Array [  ].',
+			'TypeError: `onwarn` option must be a function, but got Uint16Array [].',
 			'should fail when `onwarn` option is not a function.'
 		);
 
 		t.equal(
 			await getError('http://localhost:3018/', '__', {transform: new Uint32Array()}),
-			'TypeError: `transform` option must be a function, but got Uint32Array [  ].',
+			'TypeError: `transform` option must be a function, but got Uint32Array [].',
 			'should fail when `transform` option is not a function.'
 		);
 
