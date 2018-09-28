@@ -1,14 +1,14 @@
 {
 	"name": "dl-tar",
-	"version": "0.7.0-2",
+	"version": "0.7.0-3",
 	"description": "Download and extract a tar archive with the Observable API",
 	"repository": "shinnn/dl-tar",
 	"author": "Shinnosuke Watanabe (https://github.com/shinnn)",
+	"license": "ISC",
 	"scripts": {
 		"pretest": "eslint .",
 		"test": "nyc node test.js"
 	},
-	"license": "ISC",
 	"files": [
 		"index.js"
 	],
