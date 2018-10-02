@@ -1,6 +1,7 @@
 'use strict';
 
 const {inspect, promisify} = require('util');
+const {resolve} = require('path');
 const {Transform} = require('stream');
 
 const cancelablePump = require('cancelable-pump');
@@ -94,7 +95,7 @@ module.exports = function dlTar(...args) {
 		} arguments instead.`);
 	}
 
-	const [url, dest] = args;
+	const [url, dest, options = {}] = args;
 
 	return new Observable(observer => {
 		if (typeof url !== 'string') {
@@ -112,8 +113,6 @@ module.exports = function dlTar(...args) {
 		if (dest.length === 0) {
 			throw new Error(`${DEST_ERROR}, but got '' (empty string).`);
 		}
-
-		const options = argLen === 3 ? args[2] : {};
 
 		if (argLen === 3) {
 			if (!isPlainObj(options)) {
@@ -167,15 +166,17 @@ module.exports = function dlTar(...args) {
 			}
 		}
 
+		const cwd = process.cwd();
+		const absoluteDest = resolve(cwd, dest);
 		let ended = false;
 		let cancel;
 
 		(async () => {
 			try {
-				const [request] = await Promise.all([
+				const request = absoluteDest === cwd ? await loadRequestFromCwdOrNpm() : (await Promise.all([
 					loadRequestFromCwdOrNpm(),
-					promisifiedMkdirp(dest)
-				]);
+					promisifiedMkdirp(absoluteDest)
+				]))[0];
 
 				if (ended) {
 					return;
@@ -183,7 +184,7 @@ module.exports = function dlTar(...args) {
 
 				const unpackStream = new InternalUnpack({
 					...options,
-					cwd: dest,
+					cwd: absoluteDest,
 					observer
 				});
 
