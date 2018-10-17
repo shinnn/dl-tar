@@ -35,16 +35,16 @@
 		"load-request-from-cwd-or-npm": "^3.0.0",
 		"mkdirp": "^0.5.1",
 		"tar": "^4.4.6",
-		"zen-observable": "^0.6.1"
+		"zen-observable": "^0.8.9"
 	},
 	"devDependencies": {
-		"@shinnn/eslint-config": "^6.7.1",
+		"@shinnn/eslint-config": "^6.7.3",
 		"broken-npm-path": "^1.0.0",
 		"clear-module": "^3.0.0",
-		"eslint": "^5.6.0",
+		"eslint": "^5.7.0",
 		"lodash": "^4.17.11",
-		"nyc": "^13.0.1",
-		"nyc-config-common": "^1.0.0",
+		"nyc": "^13.1.0",
+		"nyc-config-common": "^1.0.1",
 		"p-retry": "^2.0.0",
 		"path-exists": "^3.0.0",
 		"read-utf8-file": "^2.0.0",

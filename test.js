@@ -203,15 +203,18 @@ const server = createServer((req, res) => {
 			complete: fail
 		});
 
-		dlTar('http://localhost:3018', process.cwd()).subscribe({
-			start(subscriptionItself) {
-				process.nextTick(() => {
-					t.ok(subscriptionItself.closed, 'should be immediately unsubscribable.');
-				});
-			},
+		const subscriptionImmediatelyUnsubscribed = dlTar('https://example.org', '.').subscribe({
 			error: t.fail,
 			complete: fail
-		}).unsubscribe();
+		});
+
+		subscriptionImmediatelyUnsubscribed.unsubscribe();
+
+		t.equal(
+			subscriptionImmediatelyUnsubscribed.closed,
+			true,
+			'should be immediately unsubscribable.'
+		);
 
 		dlTar('http://localhost:3018', __filename).subscribe({
 			complete: fail,
