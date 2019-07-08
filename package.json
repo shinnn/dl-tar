@@ -29,6 +29,7 @@
 		"observable"
 	],
 	"dependencies": {
+		"cancelable-pipeline": "^1.0.0",
 		"cancelable-pump": "^0.4.0",
 		"inspect-with-kind": "^1.0.5",
 		"is-plain-obj": "^1.1.0",

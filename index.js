@@ -1,10 +1,10 @@
 'use strict';
 
 const {inspect, promisify} = require('util');
+const {pipeline, Transform} = require('stream');
 const {resolve} = require('path');
-const {Transform} = require('stream');
 
-const cancelablePump = require('cancelable-pump');
+const cancelablePump = require(`cancelable-${pipeline ? 'pipeline' : 'pump'}`);
 const {Unpack} = require('tar');
 const inspectWithKind = require('inspect-with-kind');
 const isPlainObj = require('is-plain-obj');
